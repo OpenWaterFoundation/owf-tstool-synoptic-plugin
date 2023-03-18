@@ -1,0 +1,3 @@
+# Repositories that comprise TSTool Synoptic plugin:
+# - the main TSTool list also needs to be checked
+owf-tstool-synoptic-plugin

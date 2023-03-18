@@ -1,0 +1,12 @@
+# Create the NWS County Warning Area dataset and format choices for the TSTool Synoptic plugin CWA filter choices:
+# - the file is used at runtime to populate the NWS CWA input filter
+# - download the shapefile from:  https://www.weather.gov/gis/CWABounds
+# - the DBF file is distributed with the plugin in the resources/ folder
+WebGet(URI="https://www.weather.gov/source/gis/Shapefiles/WSOM/w_08mr23.zip",LocalFile="downloads/w_08mr23.zip")
+UnzipFile(InputFile="downloads\w_08mr23.zip",OutputFolder="results")
+ReadTableFromDBF(TableID="CWA",InputFile="results/w_08mr23.dbf")
+FormatTableString(TableID="CWA",InputColumns="ST,CITY",Format="%s, %s",OutputColumn="FILTER_CHOICE_TO_SORT")
+FormatTableString(TableID="CWA",InputColumns="CWA,ST,CITY",Format="%s - %s, %s",OutputColumn="FILTER_CHOICE")
+SortTable(TableID="CWA",SortColumns="FILTER_CHOICE_TO_SORT")
+WriteTableToDelimitedFile(TableID="CWA",OutputFile="results/synoptic-nws-cwa.csv")
+CopyFile(InputFile="results/synoptic-nws-cwa.csv",OutputFile="..\..\owf-tstool-synoptic-plugin\src\main\java\org\openwaterfoundation\tstool\plugin\synoptic\resources\synoptic-nws-cwa.csv")

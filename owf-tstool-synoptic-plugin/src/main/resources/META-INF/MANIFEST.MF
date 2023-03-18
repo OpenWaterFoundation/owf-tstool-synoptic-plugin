@@ -1,0 +1,18 @@
+Comment1: Manifest file to distribute with the
+Comment2: SynopticDataStore.jar file.
+Comment3: Maximum line length is 72 characters to avoid truncation.
+Comment4: Indent continued lines by a single space.
+Comment5: DataStore-Class is the path to the datastore class.
+Comment6: DataStoreFactory-Class is the path to the datastore factory class.
+Comment7: Command-Class1 is the path to a command class.
+Comment8: Increment the number as needed for the number of command classes.
+Comment9: Class-Path contains the dep/ folder for dependency jar files.
+manifest-Version: 1.0
+DataStore-Class: org.openwaterfoundation.tstool.plugin.synoptic.
+ datastore.SynopticDataStore
+DataStoreFactory-Class: org.openwaterfoundation.tstool.plugin.synoptic.
+ datastore.SynopticDataStoreFactory
+xCommand-Class1: org.openwaterfoundation.tstool.plugin.synoptic.
+ commands.ReadSynoptic_Command
+Class-Path: dep/
+
