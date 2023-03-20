@@ -76,8 +76,13 @@ To install or update the plugin:
 4.  Expand the zip file or navigate to the zip file in Windows Explorer.
     Copy the top-level folder in the zip file to the TSTool `plugins` folder
     as shown in the above folder structure.
-5.  Configure one or more datastore configuration files according to the
-    [Synoptic Data Web Services Datastore](../datastore-ref/Synoptic/Synoptic.md#datastore-configuration-file) documentation.
+5.  Configure one or more datastore configuration files:
+    *   See the
+        [Synoptic Web Services Datastore](../datastore-ref/Synoptic/Synoptic.md#datastore-configuration-file)
+        documentation for information about the datastore configuration file format.
+    *   See the [Synoptic Getting Started with the Mesonet Web Services](https://developers.synopticdata.com/mesonet/v2/getting-started/)
+        documentation for information about setting up an API token,
+        which is needed for the `ApiToken` datastore configuration property..
 6.  Test web services access using TSTool by selecting the datastore name that was configured and selecting time series.
 7.  If there are issues, use the ***View / Datastores*** menu item to list enabled datastores.
 8.  If necessary, see the [Troubleshooting](../troubleshooting/troubleshooting.md) documentation.
