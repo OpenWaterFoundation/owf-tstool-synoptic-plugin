@@ -25,12 +25,11 @@ package org.openwaterfoundation.tstool.plugin.synoptic.datastore;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,11 +41,13 @@ import java.util.Map.Entry;
 
 import org.openwaterfoundation.tstool.plugin.synoptic.PluginMeta;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.MetadataStation;
-import org.openwaterfoundation.tstool.plugin.synoptic.dao.LatestUnits;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.Network;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.NwsCwa;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.State;
+import org.openwaterfoundation.tstool.plugin.synoptic.dao.StationObservations;
+import org.openwaterfoundation.tstool.plugin.synoptic.dao.Summary;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.TimeSeriesCatalog;
+import org.openwaterfoundation.tstool.plugin.synoptic.dao.Units;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.Variable;
 import org.openwaterfoundation.tstool.plugin.synoptic.dto.JacksonToolkit;
 import org.openwaterfoundation.tstool.plugin.synoptic.ui.Synoptic_TimeSeries_CellRenderer;
@@ -66,7 +67,6 @@ import RTi.Util.GUI.InputFilter;
 import RTi.Util.GUI.InputFilter_JPanel;
 import RTi.Util.GUI.JWorksheet_AbstractExcelCellRenderer;
 import RTi.Util.GUI.JWorksheet_AbstractRowTableModel;
-import RTi.Util.IO.IOUtil;
 import RTi.Util.IO.PropList;
 import RTi.Util.IO.RequirementCheck;
 import RTi.Util.Message.Message;
@@ -84,12 +84,12 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	 * Resource path to find supporting files.
 	 */
 	public final String RESOURCE_PATH = "/org/openwaterfoundation/tstool/plugin/synoptic/resources";
-	
+
 	/**
 	 * API token required by the API, set in the datastore configuration 'ApiToken' proeprty.
 	 */
 	private String apiToken = "";
-	
+
 	/**
 	 * Properties for the plugin, used to help with application integration.
 	 */
@@ -99,7 +99,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	 * Global time series catalog, used to streamline creating lists for UI choices.
 	 */
 	private List<TimeSeriesCatalog> tscatalogList = new ArrayList<>();
-	
+
 	/**
 	 * Global state (i.e, US states) list.
 	 */
@@ -119,7 +119,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	 * Global variable list.
 	 */
 	private List<Variable> variableList = new ArrayList<>();
-	
+
 	/**
 	 * Global debug option for datastore, used for development and troubleshooting.
 	 */
@@ -133,7 +133,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	@param props properties from the datastore configuration file, which must contain the 'ApiToken' property.
 	*/
 	public SynopticDataStore ( String name, String description, URI serviceRootURI, PropList props ) {
-		String routine = getClass().getSimpleName() + ".NwsAsosDataStore";
+		String routine = getClass().getSimpleName() + ".SynopticDataStore";
 
 		String prop = props.getValue("Debug");
 		if ( (prop != null) && prop.equalsIgnoreCase("true") ) {
@@ -144,7 +144,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	    setDescription ( description );
 	    setServiceRootURI ( serviceRootURI );
 	    setProperties ( props );
-	    
+
 	    // The API token is used for all requests so set as datastore data.
 	    this.apiToken = props.getValue("ApiToken");
 	    if ( this.apiToken == null ) {
@@ -168,7 +168,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 
 	/**
 	* THIS IS PLACEHOLDER CODE - NEED TO IMPLEMENT.
-	* 
+	*
  	* Check the database requirement for DataStoreRequirementChecker interface, for example one of:
  	* <pre>
  	* @require datastore kiwis-northern version >= 1.5.5
@@ -193,7 +193,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 		// Datastore name may be an original name but a substitute is used, via TSTool command line.
 		String dsName = requireParts[2];
 		String dsNameNote = ""; // Note to add on messages to help confirm how substitutions are being handled.
-		String checkerName = "NwsAsosDataStore";
+		String checkerName = "SynopticDataStore";
 		if ( !dsName.equals(this.getName())) {
 			// A substitute datastore name is being used, such as in testing.
 			dsNameNote = "\nCommand file datastore name '" + dsName + "' substitute that is actually used is '" + this.getName() + "'";
@@ -292,9 +292,9 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			check.setIsRequirementMet ( checkerName, false, "Requirement check type '" + checkType + "' is unknown.");
 			return check.isRequirementMet();
 		}
-		
+
 	}
-	
+
 	/**
 	 * Create a time series input filter, used to initialize user interfaces.
 	 */
@@ -317,15 +317,16 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 		List<TimeSeriesCatalog> tsmetaList = readTimeSeriesMeta ( dataType, timeStep, ifp );
 		return getTimeSeriesListTableModel(tsmetaList);
 	}
-	
+
 	/**
 	 * Get the list of location identifier (station_no) strings used in the UI.
 	 * The list is determined from the cached list of time series catalog.
 	 * @param dataType to match, or * or null to return all, should be a value of stationparameter_no
 	 * @return a unique sorted list of the location identifiers (station_no)
 	 */
-	/*
-	public List<String> getLocIdStrings ( String dataType ) {
+	public List<String> getStationIdStrings ( String dataType ) {
+		List<String> locIdList = new ArrayList<>();
+		/*
 		if ( (dataType == null) || dataType.isEmpty() || dataType.equals("*") ) {
 			// Return the cached list of all locations.
 			return this.locIdList;
@@ -339,7 +340,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			for ( TimeSeriesCatalog tscatalog : this.tscatalogList ) {
 				stationNo = tscatalog.getStationNo();
 				stationParameterNo = tscatalog.getStationParameterNo();
-				
+
 				if ( !stationParameterNo.equals(dataType) ) {
 					// Requested data type does not match.
 					continue;
@@ -359,9 +360,99 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			Collections.sort(locIdList, String.CASE_INSENSITIVE_ORDER);
 			return locIdList;
 		}
+		*/
+		return locIdList;
 	}
-	*/
-	
+
+	/**
+	 * Fix a request involving 'network':
+	 * - the documentation says that the short name can be specified but it seems that only network ID can be used
+	 * - rather than switching to opaque network ID in commands, swap '&network=cwa' with '&network=63'.
+	 * @param requestUrl the full request URL
+	 * @return the updated URL with network number instead of ID
+	 */
+	private String fixNetworkRequest ( String requestUrl ) {
+		// Could probably do this with a regular expression but don't have time to fully confirm so do brute force.
+		int pos = requestUrl.indexOf("&network=");
+		if ( pos < 0 ) {
+			// Don't have a string that needs to be fixed.
+			return requestUrl;
+		}
+		else {
+			// Fix the URL:
+			// - get the following &
+			// - if not found then network is at the end of the URL
+			int pos2 = requestUrl.indexOf("&", pos + 1);
+			int posEqual = requestUrl.indexOf("=", pos + 1);
+			if ( pos2 < 0 ) {
+				// 'network' is at the end of the URL.
+				String network = requestUrl.substring(posEqual+1);
+				if ( StringUtil.isInteger(network) ) {
+					// Network is an integer so leave as is.
+					return requestUrl;
+				}
+				else {
+					// Network is not an integer so replace the short name with the ID.
+					String requestUrl2 = requestUrl.substring(0,pos) + "&network="
+						+ Network.lookupNetworkFromShortName(this.networkList, network).getId();
+					return requestUrl2;
+				}
+			}
+			else {
+				// 'network' is followed by other query parameters.
+				String network = requestUrl.substring(posEqual+1,pos2);
+				if ( StringUtil.isInteger(network) ) {
+					// Network is an integer so leave as is.
+					return requestUrl;
+				}
+				else {
+					// Network is not an integer so replace the short name with the ID.
+					String requestUrl2 = requestUrl.substring(0,pos) + "&network="
+						+ Network.lookupNetworkFromShortName(this.networkList, network).getId()
+						+ requestUrl.substring(pos2);
+					return requestUrl2;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Format a UTC time series from a DateTime in local time.
+	 * The output will be consistent with what is needed for the 'timeseries' start and end.
+	 * @param dt DateTime to format, such as from the PERIOD_OF_RECORD in UTC with Z at the end
+	 * @param stationTimeZone the station's local time zone, for example "America/Denver"
+	 * @return a formatted string in UTC
+	 */
+	private String formatUtcTimeFromLocal ( DateTime dt, String stationTimeZone ) {
+		String routine = getClass().getSimpleName() + ".formatUtcTimeFromLocal";
+		Message.printStatus(2,routine, "Converting DateTime " + dt + " to UTC time zone." );
+		// Create a ZonedDateTime from the DateTime:
+		// - use the station local time zone, NOT the time zone in 'dt'
+		// - therefore the time will be in the station local time regardless of the computer's local time
+		ZoneId zoneId = ZoneId.of(stationTimeZone);
+		ZonedDateTime zdt = ZonedDateTime.of(
+			dt.getYear(),
+			dt.getMonth(),
+			dt.getDay(),
+			dt.getHour(),
+			dt.getMinute(),
+			dt.getSecond(),
+			dt.getNanoSecond(),
+			zoneId );
+		// Convert to UTC.
+		ZoneId utcZoneId = ZoneId.of("UTC");
+		ZonedDateTime dtUtc = zdt.withZoneSameInstant(utcZoneId);
+		// Synoptic API only wants precision to minute.
+		String utcTime = String.format("%04d%02d%02d%02d%02d",
+			dtUtc.getYear(),
+			dtUtc.getMonthValue(),
+			dtUtc.getDayOfMonth(),
+			dtUtc.getHour(),
+			dtUtc.getMinute());
+		Message.printStatus(2,routine, "  UTC time = " + utcTime );
+		return utcTime;
+	}
+
 	/**
 	 * Return the API token.
 	 */
@@ -425,15 +516,31 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	}
 
 	/**
+	 * Deserialize the SUMMARY object from a response.
+	 * @param rootNode the root node that contains 'SUMMARY'
+	 * @return the Summary object for the the response
+	 */
+	private Summary getSummary ( JsonNode rootNode ) {
+		JsonNode summaryNode = rootNode.get("SUMMARY");
+		if ( summaryNode != null ) {
+			return (Summary)JacksonToolkit.getInstance().treeToValue(summaryNode, Summary.class);
+		}
+		else {
+			return null;
+		}
+	}
+
+	/**
 	 * Return the list of time series catalog.
 	 * @param readData if false, return the global cached data, if true read the data and reset in he cache
 	 */
 	public List<TimeSeriesCatalog> getTimeSeriesCatalog(boolean readData) {
 		if ( readData ) {
+			String tsid = null;
 			String dataTypeReq = null;
 			String dataIntervalReq = null;
     		InputFilter_JPanel ifp = null;
-			this.tscatalogList = readTimeSeriesCatalog(dataTypeReq, dataIntervalReq, ifp );
+			this.tscatalogList = readTimeSeriesCatalog(tsid, dataTypeReq, dataIntervalReq, ifp );
 		}
 		return this.tscatalogList;
 	}
@@ -463,19 +570,19 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	public List<String> getTimeSeriesDataIntervalStrings(String dataType, boolean includeWildcards ) {
 		//String routine = getClass().getSimpleName() + ".getTimeSeriesDataIntervalStrings";
 		List<String> dataIntervals = new ArrayList<>();
-		
-		// Currently only 5Minute since real-time synoptic data.
-		dataIntervals.add("5Minute");
+
+		// Currently only IrregSecond since not sure how timesteps align and use * wildcards.
+		dataIntervals.add("IrregSecond");
 
 		/*
 		Message.printStatus(2, routine, "Getting interval strings for data type \"" + dataType + "\"");
-		
+
 		// Only check datatype if not a wildcard.
 		boolean doCheckDataType = false;
 		if ( (dataType != null) && !dataType.isEmpty() && !dataType.equals("*") ) {
 			doCheckDataType = true;
 		}
-		
+
 		// Use the cached time series catalog read at startup.
 		List<TimeSeriesCatalog> tscatalogList = getTimeSeriesCatalog(false);
 		Message.printStatus(2, routine, "  Have " + tscatalogList.size() + " cached time series from the catalog.");
@@ -493,7 +600,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			}
 		}
 		*/
-		
+
 		// Sort the intervals:
 		// - TODO smalers need to sort by time
 		Collections.sort(dataIntervals,String.CASE_INSENSITIVE_ORDER);
@@ -502,7 +609,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			// Always allow querying list of time series for all intervals:
 			// - always add so that people can get a full list
 			// - adding at top makes it easy to explore data without having to scroll to the end
-	
+
 			dataIntervals.add("*");
 			if ( dataIntervals.size() > 1 ) {
 				// Also add at the beginning to simplify selections:
@@ -537,7 +644,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 
 		// Currently the data types are a static list, not determined from an API call.
 		List<String> dataTypes = new ArrayList<>();
-		
+
 		for ( Variable variable : this.variableList ) {
 			dataTypes.add( variable.getName() );
 		}
@@ -580,7 +687,6 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	String scenario = "";
     	String inputName = ""; // Only used for files.
     	TSIdent tsid = null;
-    	boolean useTsid = false;
 		String datastoreName = this.getName();
    		String locId = (String)tableModel.getValueAt(row,tm.COL_STATION_ID);
     	try {
@@ -608,48 +714,16 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	return new Synoptic_TimeSeries_TableModel(this,(List<TimeSeriesCatalog>)data);
     }
 
-	/**
-	 * This version is required by UI components.
- 	 * Return the list of time series statistic strings from the cached TimeSeriesCatalog list.
- 	 * This is not currently used by KiWIS.
- 	 * @param dataType data type string to filter the list of TimeSeriesCatalog.
- 	 * If null, blank, or "*" the data type is not considered when determining the list of statistics.
- 	 * @param dataInterval data interval to filter the list of TimeSeriesCatalog.
- 	 * @param includeWildcards if true, include "*" at front and back of the list
- 	 */
-	public List<String> getTimeSeriesStatisticStrings(String dataType, String dataInterval, boolean includeWildcards) {
-		String routine = getClass().getSimpleName() + ".getTimeSeriesStatisticStrings";
-		int pos = dataType.indexOf(" - ");
-		if ( pos > 0 ) {
-			// Data type includes SHEF code, for example:  WaterLevelRiver - HG
-			dataType = dataType.substring(0, pos).trim();
-		}
-		// Else use the dataType as is.
-		Message.printStatus(2, routine, "Getting statistic strings for data type \"" + dataType + "\" and interval \"" + dataInterval + "\"");
-
-		// Get the distinct statistic strings.
-
-		List<String> statisticsDistinct = new ArrayList<>();
-	
-		if ( Message.isDebugOn ) {
-	   		Message.printStatus(2, routine, "Time series catalog has " + statisticsDistinct.size() + " distinct statistics.");
-		}
-
-		// Sort the statistic strings.
-
-		Collections.sort(statisticsDistinct);
-
-		if ( includeWildcards ) {
-			// Always allow querying list of time series for all intervals:
-			// - always add so that people can get a full list
-			// - adding at top makes it easy to explore data without having to scroll to the end
-	
-			statisticsDistinct.add("*");
-			if ( statisticsDistinct.size() > 1 ) {
-				statisticsDistinct.add(0,"*");
-			}
-		}
-		return statisticsDistinct;
+    /**
+     * Get the value array name used in the 'timeseries' service response (e.g., "precip_accum_one_hour_set_1")
+     * for the 'metadata' sensor variable (e.g., "precip_accum_one_hour_1")
+     * @param sensorVariable sensor variable with the number (e.g., "precip_accum_one_hour_1")
+     */
+	private String getValueArrayNameForSensorVariable ( String sensorVariable ) {
+		// Get the ending of the input, for example "_1".
+		int pos = sensorVariable.lastIndexOf("_");
+		String number = sensorVariable.substring(pos+1);
+		return sensorVariable.substring(0,pos) + "_set_" + number;
 	}
 
 	/**
@@ -736,7 +810,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
  	*/
 	private List<NwsCwa> readNwsCwaList() throws IOException {
 		String routine = getClass().getSimpleName() + ".readNwsCwa";
-		
+
 		// Read the data file.
 		DataTable table = null;
 		BufferedReader fileReader = null;
@@ -765,7 +839,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 				Message.printWarning(3, routine, "Error reading NWS CWA list resource file." );
 				Message.printWarning(3, routine, e );
 			}
-	
+
 			if ( table != null ) {
 				// Get the column number for the FILTER_CHOICE column, which is used for the input filter:
 				// - the table has been previously sorted
@@ -814,7 +888,8 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	private List<State> readStateList() {
 		List<State> stateList = new ArrayList<>();
 
-		// States are hard-coded.
+		// States are hard-coded:
+		// - TODO smalers 2023-03-20 could put this in a file and distribute in the jar
 		stateList.add(new State("AZ", "Arizona") );
 		stateList.add(new State("AL", "Alabama") );
 		stateList.add(new State("AK", "Alaska") );
@@ -872,6 +947,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 
     /**
      * Read a single time series given its time series identifier using default read properties.
+     * This is typically called by TSID command, which uses default properties.
      * @param tsid time series identifier.
      * @param readStart start of read, will be set to 'periodStart' service parameter.
      * @param readEnd end of read, will be set to 'periodEnd' service parameter.
@@ -880,6 +956,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     public TS readTimeSeries ( String tsid, DateTime readStart, DateTime readEnd, boolean readData ) {
     	String routine = getClass().getSimpleName() + ".readTimeSeries";
     	try {
+    		Message.printStatus(2, routine, "Reading time series \"" + tsid + "\".");
     		return readTimeSeries ( tsid, readStart, readEnd, readData, null );
     	}
     	catch ( Exception e ) {
@@ -892,7 +969,6 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     /**
      * Read a single time series given its time series identifier.
      * @param tsidReq requested time series identifier.
-     * The output time series may be different depending on the requested properties.
      * @param readStart start of read, will be set to 'periodStart' service parameter.
      * @param readEnd end of read, will be set to 'periodEnd' service parameter.
      * @param readProperties additional properties to control the query:
@@ -910,9 +986,24 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     public TS readTimeSeries ( String tsidReq, DateTime readStart, DateTime readEnd,
     	boolean readData, HashMap<String,Object> readProperties ) throws Exception {
     	String routine = getClass().getSimpleName() + ".readTimeSeries";
+    	boolean debug = false;
+    	if ( Message.isDebugOn ) {
+    		debug = true;
+    	}
+
+    	// The Synoptic API requires that the start and end are set:
+    	// - default to one month of data
+    	if ( readStart == null ) {
+    		readStart = new DateTime(DateTime.DATE_CURRENT);
+    		readStart.addMonth(-1);
+    	}
+    	if ( readEnd == null ) {
+    		// Default to current.
+    		readEnd = new DateTime(DateTime.DATE_CURRENT);
+    	}
 
     	// Get the properties of interest:
-    	// - corresponds to parameters in the ReadKiWIS command
+    	// - corresponds to parameters in the ReadSynoptic command
     	// - TSID command uses the defaults and may result in more exceptions because TSID can only handle general behavior
     	if ( readProperties == null ) {
     		// Create an empty hashmap if necessary to avoid checking for null below.
@@ -943,7 +1034,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	}
 
     	TS ts = null;
-    	
+
     	// Create a time series identifier for the requested TSID:
     	// - the actual output may be set to a different identifier based on the above properties
     	// - also save interval base and multiplier for the original request
@@ -951,9 +1042,9 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
    		int intervalBaseReq = tsidentReq.getIntervalBase();
    		int intervalMultReq = tsidentReq.getIntervalMult();
    		boolean isRegularIntervalReq = TimeInterval.isRegularInterval(intervalBaseReq);
-    	
+
     	// Up front, check for invalid request and throw exceptions:
-   		// - some cases are OK as long as IrregularInterval was specified in ReadKiWIS
+   		// - some cases are OK as long as IrregularInterval was specified in ReadSynoptic
 
     	if ( tsidentReq.getInterval().isEmpty() ) {
     		// Version 1.0.0 of the plugin allowed blank interval in TSID but this is no longer accepted.
@@ -965,7 +1056,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	}
     	else if ( (intervalBaseReq == TimeInterval.DAY) && (intervalMultReq != 1) && (irregularInterval == null) ) {
    			throw new RuntimeException ( "TSID ( " + tsidReq
-   				+ ") reading NDay interval is not supported.  Use ReadKiWIS(IrregularInterval=IrregDay) or IrregHour." );
+   				+ ") reading NDay interval is not supported.  Use ReadSynoptic(IrregularInterval=IrregDay) or IrregHour." );
    		}
     	else if ( readDayAs24Hour && !((intervalBaseReq == TimeInterval.DAY) && (intervalMultReq == 1)) ) {
    			throw new RuntimeException ( "TSID (" + tsidReq + ") requesting reading day as 24 hour but input is not 1Day interval." );
@@ -975,19 +1066,39 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	}
    		else if ( (intervalBaseReq == TimeInterval.MONTH) && (irregularInterval == null) ) {
    			throw new RuntimeException ( "TSID ( " + tsidReq
-   				+ ") reading Month interval is not supported.  Use ReadKiWIS(IrregularInterval=IrregMonth)" );
+   				+ ") reading Month interval is not supported.  Use ReadSynoptic(IrregularInterval=IrregMonth)" );
    		}
    		else if ( (intervalBaseReq == TimeInterval.YEAR) && (irregularInterval == null) ) {
    			throw new RuntimeException ( "TSID ( " + tsidReq +
-   				") reading Year interval is not supported.  Use ReadKiWIS(IrregularInterval=IrregYear)" );
+   				") reading Year interval is not supported.  Use ReadSynoptic(IrregularInterval=IrregYear)" );
    		}
-    	
- 		//TimeSeriesCatalog tscatalog = null;
 
-    	// Read the time series list for the single time series.
+    	// Read the time series catalog for the requested TSID:
+    	// - TODO smalers 2023-03-18 may be able to avoid this since the 'timeseries' service also returns STATION,
+    	//   but for now do it in two steps
+
     	String dataTypeReq = null;
     	String dataIntervalReq = null;
     	InputFilter_JPanel ifp = null;
+ 		// All the matching time series catalog (should be 1 if successful).
+ 		List<TimeSeriesCatalog> tscatalogList = readTimeSeriesCatalog(tsidReq, dataTypeReq, dataIntervalReq, ifp);
+ 		// The single matching time series catalog.
+ 		TimeSeriesCatalog tscatalog = null;
+ 		if ( tscatalogList.size() == 0 ) {
+ 			// Did not match the requested time series.
+    		throw new RuntimeException ( "Did not match TSID \"" + tsidReq + "\" - cannot read the time series." );
+ 		}
+ 		else if ( tscatalogList.size() > 1 ) {
+ 			// Did not match the requested time series.
+    		throw new RuntimeException ( "Matched " + tscatalogList.size() + " TSID \"" + tsidReq +
+    			"\" but was expecting 1 match - cannot read the time series." );
+ 		}
+ 		else {
+ 			// Match a single requested time series.
+    		Message.printStatus (2,routine, "Matched TSID \"" + tsidReq + "\" - reading the time series." );
+ 		}
+ 		// For processing below, operate on the single matching time series catalog.
+ 		tscatalog = tscatalogList.get(0);
 
     	try {
     		ts = TSUtil.newTimeSeries(tsidReq.toString(), true);
@@ -995,75 +1106,242 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     	catch ( Exception e ) {
     		throw new RuntimeException ( e );
     	}
-    	
+
     	// Set the time series properties.
-    	//int intervalBaseOut = tsidentOut.getIntervalBase();
-    	//int intervalMultOut = tsidentOut.getIntervalMult();
+    	int intervalBase = tsidentReq.getIntervalBase();
+    	int intervalMult = tsidentReq.getIntervalMult();
     	try {
     		ts.setIdentifier(tsidReq);
     	}
     	catch ( Exception e ) {
     		throw new RuntimeException ( e );
     	}
-    	// Set the period to bounding data records:
+
+    	// Always set the original period to the catalog information:
+    	// - if for some reason the metadata period was not provided, set it below
+    	ts.setDate1Original(tscatalog.getSensorStartDateTime());
+    	ts.setDate2Original(tscatalog.getSensorEndDateTime());
+
+    	// Set the output period to the requested but only if regular interval:
     	// - the period may be reset below depending on time series interval, interval end adjustments, etc.
     	// - TODO smalers 2023-01-17 may need to do more to handle the case of interval data timestamps being adjusted below
+    	// - if irregular interval, the query period eill impact what is returned
     	if ( readStart != null ) {
-    		ts.setDate1Original(readStart);
-    		/*
-    		if ( TimeInterval.isRegularInterval(tsident.getIntervalBase()) ) {
-    			// Round the start down to include a full interval.
-    			readStart.round(-1, tsident.getIntervalBase(), tsident.getIntervalMult());
+    		if ( TimeInterval.isRegularInterval(intervalBase) ) {
+    			ts.setDate1(readStart);
     		}
-    		*/
-    		ts.setDate1(readStart);
     	}
     	if ( readEnd != null ) {
-    		ts.setDate2Original(readEnd);
-    		/*
-    		if ( TimeInterval.isRegularInterval(tsident.getIntervalBase()) ) {
-    			// Round the end up to include a full interval
-    			readEnd.round(1, tsident.getIntervalBase(), tsident.getIntervalMult());
+    		if ( TimeInterval.isRegularInterval(intervalBase) ) {
+    			ts.setDate2(readEnd);
     		}
-    		*/
-    		ts.setDate2(readEnd);
     	}
 
     	// Set standard properties:
-    	// - use station name for the description because the station parameter name seems to be terse
-		//ts.setDescription(tscatalog.getStationName());
-		//ts.setDataUnits(tscatalog.getDataUnits());
-		//ts.setDataUnitsOriginal(tscatalog.getDataUnits());
+    	// - use station name for the description
+    	// - data units are set below
+		ts.setDescription(tscatalog.getStationName());
 		ts.setMissing(Double.NaN);
 
 		// Set the time series properties:
 		// - additional properties are set below to help understand adjusted timestamps and offset days
-		//setTimeSeriesProperties ( ts, tscatalog );
-    	
+		setTimeSeriesProperties ( ts, tscatalog );
+
     	if ( readData ) {
+    		// Request the time series:
+    		// - station ID matches the TSID location
+    		// - sensor variable matches TSID main data type
+    		// - use 'obstimezone=local' so that output does not need to be converted
+    		// - units default to 'english'
     		StringBuilder requestUrl = new StringBuilder(
-    			getServiceRootURI() + "/stations/timeseries?" + getApiTokenParameter() +
-    			"&stid=" + tsidentReq.getLocation() + "&vars=" + tsidentReq.getType() );
-    			Message.printStatus(2, routine, "Reading data using: " + requestUrl );
-    		
+    			getServiceRootURI() + "/stations/timeseries?" + getApiTokenParameter()
+    			+ "&stid=" + tsidentReq.getLocation()
+    			+ "&vars=" + tscatalog.getSensorVariable()
+    			+ "&obtimezone=local"
+    			+ "&units=english");
+
+    			// If the read period was specific, add to the URL.
+    			if ( readStart != null ) {
+    				requestUrl.append( "&start=" + formatUtcTimeFromLocal(readStart, tscatalog.getStationTimeZone() ) );
+    			}
+    			if ( readEnd != null ) {
+    				requestUrl.append( "&end=" + formatUtcTimeFromLocal(readEnd, tscatalog.getStationTimeZone() ) );
+    			}
+
+		  		// The data for the time series will have a format similar to the following:
+		        // "OBSERVATIONS": {
+		  	    //     "date_time": [
+		  	    //       "2015-01-03T00:00:00Z",
+		  	    //       "2015-01-03T00:05:00Z",
+		  	    //       "2015-01-03T00:10:00Z",
+		  	    //       "2015-01-03T00:15:00Z",
+		  	    //       "2015-01-03T00:20:00Z"
+		  	    //     ],
+		  	    //     "air_temp_set_1": [-5.6, -5.6, -6.1, -6.1, -6.7]
+		  	    //
+		  		//
+		  		// Use the rootNode to get the observations node and then decode somewhat manually because,
+		  		// once again, the key is the sensor variable and not a generic name.
+		  		// If here only one station will have returned.
+
     			// Request the data.
     			JsonNode rootNode = null;
 		  		String arrayName = null;
+    			Message.printStatus(2, routine, "Reading time series data using: " );
+    			Message.printStatus(2, routine, "  " + requestUrl );
 		  		try {
 		  			rootNode = JacksonToolkit.getInstance().getJsonNodeFromWebServiceUrl(requestUrl.toString(), arrayName);
 		  		}
 		  		catch ( Exception e ) {
 			  		Message.printWarning(3,routine,"Error reading 'timeseries' service (" + e + ").");
 			  		Message.printWarning(3,routine,e);
+			  		// Rethrow the exception.
+			  		throw new RuntimeException ( "Error requesting data from the 'timeseries' service.", e );
 		  		}
 
-    		// Also read the time series values.
-    		StringBuilder valuesUrl = new StringBuilder();
-    		/*
+		  		// Process the 'SUMMARY' to check if the request had a problem.
+		  		Summary summary = getSummary(rootNode);
+		  		if ( summary == null ) {
+			  		String message = "Unable to find 'SUMMARY' in response - cannot evaluate success.";
+			  		Message.printWarning(3, routine, message );
+		  		}
+		  		else if ( summary.isOk() ) {
+			  		String message = "Request returned RESPONSE_CODE=" + summary.getResponseCode() + " - OK to continue.";
+			  		Message.printStatus(2, routine, "  " + message );
+		  		}
+		  		else {
+			  		String message = "Request returned RESPONSE_CODE=" + summary.getResponseCode() + " - cannot continue.";
+			  		Message.printWarning(3, routine, "  " + message );
+			  		throw new RuntimeException ( message );
+		  		}
+
+		  		// Process the "UNITS" map:
+		  		// - not in 'metadata' (is in 'latest' and 'timeseries')
+		  		List<Units> unitsList = new ArrayList<>();
+		  		try {
+			  		JsonNode unitsNode = rootNode.get("UNITS");
+			  		if ( unitsNode != null ) {
+				  		// Iterate through the map.
+				  		Iterator<Entry<String, JsonNode>> mapNodes = unitsNode.fields();
+				  		while ( mapNodes.hasNext() ) {
+					  		Map.Entry<String, JsonNode> unitNode = mapNodes.next();
+					  		String variable = unitNode.getKey();
+					  		JsonNode value = (JsonNode)unitNode.getValue();
+					  		String units = value.asText();
+					  		Units latestUnits = new Units(variable,units);
+					  		unitsList.add(latestUnits);
+				  		}
+				  		Message.printStatus(2, routine, "Read " + unitsList.size() + " units from 'timeseries'.");
+			  		}
+		  		}
+		  		catch ( Exception e ) {
+			  		Message.printWarning(3,routine,"Error reading 'UNITS' from 'timeseries' results (" + e + ").");
+			  		Message.printWarning(3,routine,e);
+		  		}
+		  		// Set the units based on the sensor variable.
+		  		for ( Units units : unitsList ) {
+		  			if ( units.getVariableName().equalsIgnoreCase(tscatalog.getSensorVariable()) ) {
+		  				ts.setDataUnits(units.getUnits());
+		  				ts.setDataUnitsOriginal(units.getUnits());
+		  			}
+		  		}
+
+		  		// Get data out of the object.
+
+		  		JsonNode stationArrayNode = rootNode.get("STATION");
+		  		int dataCount = 0;
+		  		if ( stationArrayNode != null ) {
+		  			if ( stationArrayNode.size() == 0 ) {
+			  			Message.printWarning(3, routine, "  Read 0 items ('STATION' JSON node not read).");
+		  			}
+		  			else if ( stationArrayNode.size() > 1 ) {
+			  			Message.printWarning(3, routine, "  Read " + stationArrayNode.size() + "  items ('STATION' has too many elements).");
+		  			}
+		  			else {
+		  				// Have one station, as expected:
+		  				// - one station but iterate through the array
+		  				Message.printStatus(2, routine, "  Read 1 STATION from 'metadata' service - continuing to read observations.");
+		  				Message.printStatus(2, routine, "  Looping through " + stationArrayNode.size() + " stations in STATION.");
+			  			for ( int i = 0; i < stationArrayNode.size(); i++ ) {
+				  			JsonNode stationNode = stationArrayNode.get(i);
+				  			// Get the "OBSERVATIONS" node.
+				  			JsonNode observationsNode = stationNode.get("OBSERVATIONS");
+				  			if ( observationsNode != null ) {
+				  				JsonNode valuesNode = observationsNode.get(
+				  					getValueArrayNameForSensorVariable(tscatalog.getSensorVariableOut()));
+				  				if ( valuesNode != null ) {
+				  					// Get the object matching the sensor variable, with _1, etc.
+				  					// Decode the observations 'date_time' array and corresponding values.
+				  					StationObservations stationObservations = (StationObservations)
+				  						JacksonToolkit.getInstance().treeToValue(observationsNode, StationObservations.class);
+				  					String [] dateTimeArray = stationObservations.getDateTimeArray();
+				  					Message.printStatus(2, routine, "  'date_time' array has " + dateTimeArray.length + " items.");
+				  					// Decode the values array, for example:
+				  					//   "air_temp_set_1": [-5.6, -5.6, -6.1, -6.1, -6.7]
+				  					// If have data, loop through and transfer the data using the iterator below.
+				  					Iterator<JsonNode> valueNodesIterator = valuesNode.elements();
+				  					if ( dateTimeArray != null ) {
+				  						String dateTimeString = null;
+			  							Double value = null;
+			  							DateTime dateTime = null;
+				  						for ( int iVal = 0; iVal < dateTimeArray.length; iVal++ ) {
+				  							dateTimeString = dateTimeArray[iVal];
+				  							// Convert the string to a DateTime.
+				  							try {
+				  								dateTime = DateTime.parse(dateTimeString);
+				  							}
+				  							catch ( Exception e ) {
+				  								Message.printWarning(3, routine, "Error parsing observation date/tme: \"" + dateTimeString + "\"");
+				  								// Skip the value.
+				  								continue;
+				  							}
+				  							if ( valueNodesIterator.hasNext() ) {
+				  									JsonNode valueNode = valueNodesIterator.next();
+				  								// Value is a Double.
+				  								if ( valueNode.isNull() ) {
+				  									value = Double.NaN;
+				  								}
+				  								else {
+				  									value = valueNode.asDouble();
+				  								}
+				  							}
+				  							else {
+				  								// No more values.
+				  								break;
+				  							}
+				  							// Set the value in the time series:
+				  							// - there are no flags
+				  							// - TODO smalers 2023-03-19 may need to add logic to covert to daily, etc.
+				  							if ( debug ) {
+				  								Message.printStatus(2, routine, "  Setting data " + dateTime + " " + value);
+				  							}
+				  							ts.setDataValue(dateTime, value);
+				  							++dataCount;
+				  						}
+				  						Message.printStatus(2, routine, "  Read " + dataCount + " data values.");
+				  					}
+				  				}
+				  				else {
+			  						Message.printStatus(2, routine, "  Did not find " + tscatalog.getSensorVariableOut()
+			  							+ " array in STATION.OBSERVATIONS.");
+			  					}
+				  			}
+			  				else {
+			  					Message.printStatus(2, routine, "  Did not find 'OBSERVATIONS' array in STATION[" + i + "].");
+			  				}
+			  			}
+		  			}
+		  		}
+
+		  		// Loop through the stations.
+
+		  		// TODO smalers 2023-03-20 could enable the following like KiWIS plugin if it seems relevent.
+
+     		/*
     		List<TimeSeriesValue> timeSeriesValueList = readTimeSeriesValues (
     			kiwisTsid, kiwisTsPath, readStart, readEnd, readProperties,
     			valuesUrl );
-    		
+
     		String dataFlag = null;
     		DateTime dateTime = null;
     		double value;
@@ -1247,7 +1525,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     					ts.setDate2Original(date2Original);
    					}
     			}
-    			
+
     			// If reading day interval, convert midnight hour 0 of the next day to day precision of the previous day,
     			// for example:
     			//   2023-01-01 00:00:00 -> 2022-12-31
@@ -1257,9 +1535,9 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     			// - do this after adjusting the period for timestamps
     			// - irregular interval does not allocate an array up front
     			ts.allocateDataSpace();
-    			
+
     			// Transfer the TimeSeriesValue list to the TS data.
-    			
+
     			Message.printStatus(2,routine, "Transferring " + timeSeriesValueList.size() + " time series values.");
     			timeAdjustCount = 0;
     			for ( TimeSeriesValue tsValue : timeSeriesValueList ) {
@@ -1303,10 +1581,10 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     						if ( isRegularIntervalReq ) {
     							timeAdjustCount += adjustTimeForInterpolationType(intervalBaseReq, intervalMultReq, dateTime, interpolationType);
     						}
-	
+
     						// Look up the data flag from the quality code integer.
     						dataFlag = lookupQualityCode(qualityCodeList, tsValue.getQualityCode());
-	
+
     						// Also check daily interval time series:
     						// - if the hour is not zero, count and add as a property later
     						// - time zone is ignored so -0700, -0600, etc. does not come into play
@@ -1352,7 +1630,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     							// - set the precision based on what was requested
     							dateTime.setPrecision(irregularInterval.getIrregularIntervalPrecision());
     						}
-    					
+
     						// Set the data value in the time series:
     						// - the date/time will be copied if necessary and the precision set to be consistent with the time series
     						if ( Message.isDebugOn ) {
@@ -1402,7 +1680,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
     			}
     		}
     		*/
-    		
+
     		// Set additional time series properties to help understand the data.
     		/*
     		ts.setProperty("ts.TimestampsAdjustedToIntervalEndCount", new Integer(timeAdjustCount));
@@ -1418,64 +1696,122 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 
 	/**
 	 * Read time series catalog, which uses the "/getTimeseriesList" web service query.
+	 * @param tsid requested time series identifier, called from readTimeSeries() to get metadata,
+	 *        if null use the filters to read 1+ time series catalog
 	 * @param dataTypeReq Requested data type (e.g., "DischargeRiver") or "*" to read all data types,
 	 *        or null to use default of "*".
 	 * @param dataIntervalReq Requested data interval (e.g., "IrregSecond") or "*" to read all intervals,
 	 *        or null to use default of "*".
 	 * @param ifp input filter panel with "where" conditions
 	 */
-	public List<TimeSeriesCatalog> readTimeSeriesCatalog ( String dataTypeReq, String dataIntervalReq, InputFilter_JPanel ifp ) {
+	public List<TimeSeriesCatalog> readTimeSeriesCatalog ( String tsid, String dataTypeReq, String dataIntervalReq, InputFilter_JPanel ifp ) {
 		String routine = getClass().getSimpleName() + ".readTimeSeriesCatalog";
 
 		// Note that when requesting additional fields with 'returnfields', aLL fields to be returned must be specified,
 		// not just additional fields above the default.
-		StringBuilder requestUrl = new StringBuilder(
-			getServiceRootURI() + "/stations/metadata?" + getApiTokenParameter() + "&complete=1&sensorvars=1");
+		StringBuilder requestUrl = null;
+		String requestUrlString = null;
 
-		// Add filters for the data type and time step.
-		
-		if ( (dataTypeReq != null) && !dataTypeReq.isEmpty() && !dataTypeReq.equals("*") ) {
+		TSIdent tsident = null;
+		// The following are checked below to know when the data type contains a _1, etc.
+		String tsidDataTypeReq = null;
+		String tsidDataSubTypeReq = null;
+		Message.printStatus(2,routine,"Reading time series catalog using:" );
+		Message.printStatus(2,routine,"  tsid=\"" + tsid + "\"");
+		Message.printStatus(2,routine,"  dataTypeReq=\"" + dataTypeReq + "\"" );
+		Message.printStatus(2,routine,"  dataIntervalReq=\"" + dataIntervalReq + "\"");
+		if ( ifp == null ) {
+			Message.printStatus(2,routine,"  ifp=null");
+		}
+		else {
+			Message.printStatus(2,routine,"  ifp=not null");
+		}
+		if ( (tsid != null) && !tsid.isEmpty() ) {
+			// Form the web service request based on the TSID parts.
 			try {
-				//requestUrl.append ( "&var=" + URLEncoder.encode(dataTypeReq,StandardCharsets.UTF_8.toString()) );
-				requestUrl.append ( "&var=" + dataTypeReq );
+				tsident = TSIdent.parseIdentifier(tsid);
 			}
 			catch ( Exception e ) {
-				// TODO smalers 2023-01-01 should not happen.
+				throw new RuntimeException("Error parsing the requested time series identifier \"" + tsid + "\"");
 			}
+			requestUrl = new StringBuilder(
+				getServiceRootURI() + "/stations/metadata?" + getApiTokenParameter() + "&complete=1&sensorvars=1");
+			// Request the specific station.
+			requestUrl.append("&stid=" + tsident.getLocation());
+			// Request the main variable:
+			// - data type may include the main sensor variable and the numbered variable, separated by a dash
+			String dataType = tsident.getType();
+			if ( dataType.indexOf("-") > 0 ) {
+				// Need to use the first part.
+				String [] parts = dataType.split("-");
+				dataType = parts[0].trim();
+				tsidDataTypeReq = parts[0].trim();
+				tsidDataSubTypeReq = parts[1].trim();
+			}
+			else {
+				// Only the main data type is requested.
+				tsidDataTypeReq = dataType;
+				tsidDataSubTypeReq = null;
+			}
+			requestUrl.append("&var=" + dataType);
+			// Workaround to fix the network issue.
+			requestUrlString = fixNetworkRequest ( requestUrl.toString() );
+			Message.printStatus(2, routine, "Reading 1 station time series metadata using:" );
+			Message.printStatus(2, routine, "  " + requestUrlString);
+		}
+		else {
+			// Reading 1+ time series using the provided filter parameters.
+			requestUrl = new StringBuilder(
+				getServiceRootURI() + "/stations/metadata?" + getApiTokenParameter() + "&complete=1&sensorvars=1");
+
+			// Add filters for the data type and time step.
+
+			if ( (dataTypeReq != null) && !dataTypeReq.isEmpty() && !dataTypeReq.equals("*") ) {
+				try {
+					//requestUrl.append ( "&var=" + URLEncoder.encode(dataTypeReq,StandardCharsets.UTF_8.toString()) );
+					requestUrl.append ( "&var=" + dataTypeReq );
+				}
+				catch ( Exception e ) {
+					// TODO smalers 2023-01-01 should not happen.
+				}
+			}
+
+			if ( (dataIntervalReq != null) && !dataIntervalReq.isEmpty() && !dataIntervalReq.equals("*") ) {
+				// Synoptic always returns 5Minute?
+			}
+
+			// Add query parameters based on the input filter:
+			// - this includes list type parameters and specific parameters to match database values
+			int numFilterWheres = 0; // Number of filter where clauses that are added.
+			if ( ifp != null ) {
+	        	int nfg = ifp.getNumFilterGroups ();
+	        	InputFilter filter;
+	        	for ( int ifg = 0; ifg < nfg; ifg++ ) {
+	            	filter = ifp.getInputFilter ( ifg );
+	            	//Message.printStatus(2, routine, "IFP whereLabel =\"" + whereLabel + "\"");
+	            	boolean special = false; // TODO smalers 2022-12-26 might add special filters.
+	            	if ( special ) {
+	            	}
+	            	else {
+	            		// Add the query parameter to the URL.
+				    	filter = ifp.getInputFilter(ifg);
+				    	String queryClause = WebUtil.getQueryClauseFromInputFilter(filter,ifp.getOperator(ifg));
+				    	if ( Message.isDebugOn ) {
+				    		Message.printStatus(2,routine,"Filter group " + ifg + " where is: \"" + queryClause + "\"");
+				    	}
+				    	if ( queryClause != null ) {
+				    		requestUrl.append("&" + queryClause);
+				    		++numFilterWheres;
+				    	}
+	            	}
+	        	}
+	        }
+			// Workaround to fix the network issue.
+			requestUrlString = fixNetworkRequest ( requestUrl.toString() );
+			Message.printStatus(2, routine, "Reading 1+ station time series metadata using:" );
+			Message.printStatus(2, routine, "  " + requestUrlString);
 		}
 
-		if ( (dataIntervalReq != null) && !dataIntervalReq.isEmpty() && !dataIntervalReq.equals("*") ) {
-			// Synoptic always returns 5Minute?
-		}
-		
-		// Add query parameters based on the input filter:
-		// - this includes list type parameters and specific parameters to match database values
-		int numFilterWheres = 0; // Number of filter where clauses that are added.
-		if ( ifp != null ) {
-	        int nfg = ifp.getNumFilterGroups ();
-	        InputFilter filter;
-	        for ( int ifg = 0; ifg < nfg; ifg++ ) {
-	            filter = ifp.getInputFilter ( ifg );
-	            //Message.printStatus(2, routine, "IFP whereLabel =\"" + whereLabel + "\"");
-	            boolean special = false; // TODO smalers 2022-12-26 might add special filters.
-	            if ( special ) {
-	            }
-	            else {
-	            	// Add the query parameter to the URL.
-				    filter = ifp.getInputFilter(ifg);
-				    String queryClause = WebUtil.getQueryClauseFromInputFilter(filter,ifp.getOperator(ifg));
-				    if ( Message.isDebugOn ) {
-				    	Message.printStatus(2,routine,"Filter group " + ifg + " where is: \"" + queryClause + "\"");
-				    }
-				    if ( queryClause != null ) {
-				    	requestUrl.append("&" + queryClause);
-				    	++numFilterWheres;
-				    }
-	            }
-	        }
-		}
-		
-		Message.printStatus(2, routine, "Reading time series list from: " + requestUrl);
 		List<MetadataStation> metadataStationList = new ArrayList<>();
 		JsonNode jsonNode = null;
 		JsonNode rootNode = null;
@@ -1483,20 +1819,37 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 		// Request the data.
 		String arrayName = null;
 		try {
-			rootNode = JacksonToolkit.getInstance().getJsonNodeFromWebServiceUrl(requestUrl.toString(), arrayName);
+			rootNode = JacksonToolkit.getInstance().getJsonNodeFromWebServiceUrl(requestUrlString, arrayName);
 		}
 		catch ( Exception e ) {
-			Message.printWarning(3,routine,"Error reading 'metadata' service (" + e + ").");
+			String message = "Error reading 'metadata' service (" + e + ").";
+			Message.printWarning(3,routine,"  " + message);
 			Message.printWarning(3,routine,e);
+			throw new RuntimeException ( message, e);
+		}
+
+		// Process the 'SUMMARY' to check if the request had a problem.
+		Summary summary = getSummary(rootNode);
+		if ( summary == null ) {
+			String message = "Unable to find 'SUMMARY' in response - cannot evaluate success.";
+			Message.printWarning(3, routine, message );
+		}
+		else if ( summary.isOk() ) {
+	  		String message = "Request returned RESPONSE_CODE=" + summary.getResponseCode() + " - OK to continue.";
+	  		Message.printStatus(2, routine, "  " + message );
+  		}
+  		else {
+			String message = "Request returned RESPONSE_CODE=" + summary.getResponseCode() + " - cannot continue.";
+			Message.printWarning(3, routine, "  " + message );
+			throw new RuntimeException ( message );
 		}
 
 		// Process the "UNITS" map:
-		// - not in 'metadata' (is in 'latest')
-		/*
+		// - not in 'metadata' (is in 'latest' and 'timeseries')?
 		arrayName = "UNITS";
-		List<LatestUnits> latestUnitsList = new ArrayList<>();
+		List<Units> latestUnitsList = new ArrayList<>();
 		try {
-			jsonNode = rootNode.path(arrayName);
+			jsonNode = rootNode.get(arrayName);
 			if ( jsonNode != null ) {
 				// Iterate through the map.
 				Iterator<Entry<String, JsonNode>> mapNodes = jsonNode.fields();
@@ -1505,21 +1858,22 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 					String variable = unitNode.getKey();
 					JsonNode value = (JsonNode)unitNode.getValue();
 					String units = value.asText();
-					LatestUnits latestUnits = new LatestUnits(variable,units);
+					Units latestUnits = new Units(variable,units);
 					latestUnitsList.add(latestUnits);
 				}
+				Message.printStatus(2, routine, "Read " + latestUnitsList.size() + " units from 'metadata'.");
 			}
 		}
 		catch ( Exception e ) {
 			Message.printWarning(3,routine,"Error reading 'UNITS' from 'latest' results (" + e + ").");
 			Message.printWarning(3,routine,e);
 		}
-		*/
 
-		// Process the "STATIONS" array.
+		// Process the "STATION" array.
 		arrayName = "STATION";
 		try {
-			jsonNode = rootNode.path(arrayName);
+			// 'get' will return null if not found.
+			jsonNode = rootNode.get(arrayName);
 		}
 		catch ( Exception e ) {
 			Message.printWarning(3,routine,"Error reading 'metadata' service (" + e + ").");
@@ -1530,13 +1884,13 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			for ( int i = 0; i < jsonNode.size(); i++ ) {
 				metadataStationList.add((MetadataStation)JacksonToolkit.getInstance().treeToValue(jsonNode.get(i), MetadataStation.class));
 			}
-			Message.printStatus(2, routine, "  Created " + metadataStationList.size() + " stations from 'metadata' service.");
+			Message.printStatus(2, routine, "  Created " + metadataStationList.size() + " stations from 'metadata' service response.");
 		}
 		else {
 			Message.printStatus(2, routine, "  Read 0 items ('STATION' JSON node not read).");
 		}
-		
-		// Convert the KiWIS TimeSeries objects to TimeSeriesCatalog:
+
+		// Convert the Synoptic MetadataStation objects to TimeSeriesCatalog:
 		// - also filter on the data interval, which is not a web service parameter
 		boolean doCheckInterval = false;
 		if ( (dataIntervalReq != null) && !dataIntervalReq.isEmpty() && !dataIntervalReq.equals("*") ) {
@@ -1544,7 +1898,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 		}
 		List<TimeSeriesCatalog> tscatalogList = new ArrayList<>();
 		String dataInterval;
-		
+
 		// Loop through the 'MetadataStation' instances and create corresponding TimeSeriesCatalog entries.
 		for ( MetadataStation metadataStation : metadataStationList ) {
 			// TODO smalers 2023-03-16 need to get the data interval from the variable?
@@ -1556,7 +1910,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			}
 
 			// Matched the filters so continue adding.
-			
+
 			// Loop through the sensor variables (SENSOR_VARIABLES) for the station.
 			//
 		    //  "SENSOR_VARIABLES": {
@@ -1579,6 +1933,8 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			//
 			// The following map corresponds to the SENSOR_VARIABLES key.
 			Map<String, ?> SENSOR_VARIABLES_Map = metadataStation.getSensorVariablesMap();
+			// Used to break out of multiple levels of for loops.
+			boolean doBreak = false;
 			if ( SENSOR_VARIABLES_Map != null ) {
 				for ( Map.Entry<String, ?> sensorVariableEntry : metadataStation.getSensorVariablesMap().entrySet() ) {
 					// Get the data for the sensor variable:
@@ -1620,7 +1976,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 								}
 							}
 						}
-	
+
 						// Standard properties expected by TSTool:
 						// - data source is set to network below
 						if ( sensorVariableOutMap.size() == 1 ) {
@@ -1641,7 +1997,7 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 							tscatalog.setDataUnits(units.getUnits());
 						}
 						*/
-	
+
 						if ( StringUtil.isDouble(metadataStation.getElevation()) ) {
 							Double elevation = Double.parseDouble(metadataStation.getElevation());
 							tscatalog.setStationElevation(elevation);
@@ -1662,15 +2018,16 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 						tscatalog.setStationMnetId(metadataStation.getMnetId());
 						Network network = Network.lookupNetworkFromId(this.networkList, metadataStation.getMnetId());
 						if ( network != null ) {
-							tscatalog.setStationMnet(network.getShortName());
-							tscatalog.setDataSource(network.getShortName());
+							// Replace space with underscore to avoid issues with TSIDs including whitespace.
+							tscatalog.setStationMnet(network.getShortName().replace(" ", "_"));
+							tscatalog.setDataSource(network.getShortName().replace(" ", "_"));
 						}
 						tscatalog.setStationQcFlagged(metadataStation.getQcFlagged());
 						tscatalog.setStationName(metadataStation.getName());
 						tscatalog.setStationState(metadataStation.getState());
 						tscatalog.setStationStatus(metadataStation.getStatus());
 						tscatalog.setStationTimeZone(metadataStation.getTimeZone());
-						
+
 						// Sensor variable.
 						tscatalog.setSensorVariable(sensorVariableName);
 						tscatalog.setSensorVariableOut(sensorVariableNameOut);
@@ -1678,7 +2035,36 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 						tscatalog.setSensorEnd(end);
 
 						// Save the catalog in the list.
-						tscatalogList.add(tscatalog);
+						if ( (tsid != null) && !tsid.isEmpty() ) {
+							// Reading a single time series:
+							// - only save if the request is matched and can then break out of the loop
+							if ( tsidDataSubTypeReq == null ) {
+								// Check the main sensor variable.
+								if ( sensorVariableName.equalsIgnoreCase(tsidDataTypeReq) ) {
+									// Save the catalog and return it.
+									tscatalogList.add(tscatalog);
+									doBreak = true;
+									break;
+								}
+							}
+							else {
+								// Check the main sensor variable and the numbered variable.
+								if ( sensorVariableName.equalsIgnoreCase(tsidDataTypeReq) &&
+									sensorVariableNameOut.equalsIgnoreCase(tsidDataSubTypeReq)) {
+									// Save the catalog and return it.
+									tscatalogList.add(tscatalog);
+									doBreak = true;
+									break;
+								}
+							}
+						}
+						else {
+							// Reading 1+ catalogs so always add.
+							tscatalogList.add(tscatalog);
+						}
+					}
+					if ( doBreak ) {
+						break;
 					}
 				}
 			}
@@ -1687,180 +2073,9 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 				Message.printStatus(2, routine, "No sensor variables map for station \"" + metadataStation.getStid() + "\"");
 			}
 		}
-		
+
 		return tscatalogList;
 	}
-
-    /**
-     * Read time series values.
-     * @param kiwisTsid the KiWIS 'ts_id' when the TSID uses location type.
-     * @param kiwisTsPath the KiWIS 'ts_path' when the TSID uses parts similar to the 'ts_path'
-     * @param readStart start of read, will be set to 'periodStart' service parameter.
-     * @param readEnd end of read, will be set to 'periodEnd' service parameter.
-     * @param readProperties additional properties to control the query:
-     * <ul>
-     * <li> Not yet implemented.</li>
-     * </ul>
-     * @param url StringBuilder to save the path
-     * @return the list of time series values, may be an empty list
-     */
-	/*
-    public List<TimeSeriesValue> readTimeSeriesValues ( Integer kiwisTsid, String kiwisTsPath, DateTime readStart, DateTime readEnd,
-    	HashMap<String,Object> readProperties, StringBuilder url ) throws Exception {
-    	//throws IOException {
-    	String routine = getClass().getSimpleName() + ".readTimeSeriesValues";
-    	List<TimeSeriesValue> timeSeriesValues = new ArrayList<>();
-
-		// Note that when requesting additional fields with 'returnfields', aLL fields to be returned must be specified,
-		// not just additional fields above the default.
-
-
-		//String format="dajson";
-		String format="csv";
-
-		StringBuilder requestUrl = new StringBuilder(
-			getServiceRootURI() + COMMON_REQUEST_PARAMETERS + "&request=getTimeseriesValues&format=" + format
-				+ "&ts_id=" + kiwisTsid
-				+ "&returnfields="
-				+ URLEncoder.encode("Timestamp,Value,Quality Code,Interpolation Type",StandardCharsets.UTF_8.toString()));
-		
-		// Add where for period to query using ISO format "YYYY-MM-DD hh:mm:ss":
-		// - no T between date and time?
-		// - must URLencode the string
-		
-		if ( readStart != null ) {
-			//requestUrl.append("&from=" + readStart);
-			requestUrl.append("&from=" + URLEncoder.encode(readStart.toString(DateTime.FORMAT_YYYY_MM_DD_HH_mm),StandardCharsets.UTF_8.toString()));
-		}
-		if ( readEnd != null ) {
-			//requestUrl.append("&to=" + readEnd);
-			requestUrl.append("&to=" + URLEncoder.encode(readEnd.toString(DateTime.FORMAT_YYYY_MM_DD_HH_mm),StandardCharsets.UTF_8.toString()));
-		}
-		if ( (readStart == null) && (readEnd == null) ) {
-			// Request all data.
-			requestUrl.append("&period=complete");
-		}
-		
-		// Pass back the URL to the calling code so it can be added as a time series property.
-		if ( url != null ) {
-			url.append(requestUrl.toString());
-		}
-		
-		Message.printStatus(2, routine, "Reading time series values from: " + requestUrl);
-
-		// Request the JSON and parse into objects.
-
-		if ( format.equals("csv") ) {
-			/ * Format is similar to the following:
-			 * - semi-colons are used since not encountered in data?
-			#ts_id;957010
-			#rows;1
-			#Timestamp;Value
-			2022-12-30T18:00:00.000-07:00;84.88
-			* /
-			// Read the URI content into a string:
-			// - break by newlines and then process
-			String outputFile = null;
-			StringBuilder outputString = new StringBuilder();
-			// Set timeout to 5 minutes.
-			int connectTimeout = 300000;
-			int readTimeout = 300000;
-			// URL-encode the URL so that for example space is replaced by %20
-			IOUtil.getUriContent(requestUrl.toString(), outputFile, outputString, connectTimeout, readTimeout);
-			BufferedReader reader = new BufferedReader(new StringReader(outputString.toString()));
-			String line = null;
-			String delim = ";";
-			List<String> tokens = null;
-			TimeSeriesValue timeSeriesValue = null;
-			int valueCount = 0;
-			boolean fieldCountWarned = false;
-			String interpolationType;
-			while ( (line = reader.readLine()) != null ) {
-				if ( line.isEmpty() ) {
-					// Totally empty line.
-					continue;
-				}
-				else if ( line.trim().isEmpty() ) {
-					// Empty after removing whitespace.
-					continue;
-				}
-				else if ( line.charAt(0) == '#' ) {
-					// Comment.
-					continue;
-				}
-
-				// Split the line by semicolons.
-				tokens = StringUtil.breakStringList(line, delim, 0);
-				// Make sure the number of requested fields matches:
-				// - see the request URL for fields that should be included
-				if ( tokens.size() == 4 ) {
-					// Create a new value object.
-					timeSeriesValue = new TimeSeriesValue();
-					// Transfer the values from response to the value object.
-					timeSeriesValue.setTimestamp(tokens.get(0));
-					timeSeriesValue.setValue(tokens.get(1));
-					timeSeriesValue.setQualityCode(tokens.get(2));
-					interpolationType = tokens.get(3).trim();
-					//Message.printStatus(2, routine, "interpolationType=" + interpolationType);
-					//if ( interpolationType.isEmpty() ) {
-					//	timeSeriesValue.setInterpolationType(InterpolationType.MISSING_INTERPOLATION);
-					//}
-					//else
-					if ( StringUtil.isInteger(interpolationType) ) {
-						// If interpolation type is missing, set to missing.
-						timeSeriesValue.setInterpolationType(Integer.parseInt(interpolationType));
-					}
-					else {
-						// Interpolation type will be set to unknown and will cause an error when time series values are processed.
-					}
-					// Add the value object to the list to return.
-					timeSeriesValues.add(timeSeriesValue);
-					++valueCount;
-				}
-				else {
-					if ( !fieldCountWarned ) {
-						// Warn once to help with troubleshooting:
-						// - probably added a field the request but did not change token size check above
-						Message.printWarning(3, routine, "  Time series values list has the wrong number of fields.");
-						fieldCountWarned = true;
-					}
-				}
-			}
-			Message.printStatus(2, routine, "  Read " + valueCount + " time series values.");
-		}
-		else if ( format.equals("dajson") ) {
-			// format=dajson returns the following, which is somewhat difficult to handle so use csv.
-			/ *
-			[ {
-			  	"ts_id" : "957010",
-			  	"rows" : "1",
-			  	"columns" : "Timestamp,Value",
-			  	"data" : [ [ "2022-12-30T17:00:00.000-07:00", 78.31 ] ]
-				} ]
-			* /
-			JsonNode jsonNode = null;
-			String arrayName = null;
-			try {
-				jsonNode = JacksonToolkit.getInstance().getJsonNodeFromWebServiceUrl(requestUrl.toString(), arrayName);
-			}
-			catch ( Exception e ) {
-				Message.printWarning(3,routine,"Error reading time series values (" + e + ").");
-				Message.printWarning(3,routine,e);
-			}
-			if ( (jsonNode != null) && (jsonNode.size() > 0) ) {
-				Message.printStatus(2, routine, "  Read " + jsonNode.size() + " time series values.");
-				for ( int i = 0; i < jsonNode.size(); i++ ) {
-					timeSeriesValues.add((TimeSeriesValue)JacksonToolkit.getInstance().treeToValue(jsonNode.get(i), TimeSeriesValue.class));
-				}
-			}
-			else {
-				Message.printStatus(2, routine, "  Read 0 time series values.");
-			}
-		}
-    	
-    	return timeSeriesValues;
-    }
-		*/
 
     /**
      * Read time series metadata, which results in a query that joins station, station_type, point, point_class, and point_type.
@@ -1875,14 +2090,15 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 	   	if ( pos > 0 ) {
 		   	dataIntervalReq = dataIntervalReq.substring(0, pos).trim();
 	   	}
+		String tsid = null;
 	   	// By default all time series are included in the catalog:
 	   	// - the filter panel options can be used to constrain
-	    return readTimeSeriesCatalog ( dataTypeReq, dataIntervalReq, ifp );
+	    return readTimeSeriesCatalog ( tsid, dataTypeReq, dataIntervalReq, ifp );
 	}
 
 	/**
  	* Read the variable list objects from JSON similar to:
- 	* 
+ 	*
  	*   "VARIABLES": [
  	*     {
  	*       "air_temp": {
@@ -1915,8 +2131,9 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 			// The following gets the JSON from the URL.
 			JsonNode rootNode = mapper.readTree(request);
 			String element = "VARIABLES";
-			// Position the node at the "VARIABLES" node.
-			JsonNode jsonNode = rootNode.path(element);
+			// Position the node at the "VARIABLES" node:
+			// - 'get' will return null if not found
+			JsonNode jsonNode = rootNode.get(element);
 			if ( jsonNode != null ) {
 				Message.printStatus(2, routine, "VARIABLES has " + jsonNode.size() + " objects.");
 			}
@@ -1979,30 +2196,28 @@ public class SynopticDataStore extends AbstractWebServiceDataStore implements Da
 
     /**
      * Set the time series properties from the TimeSeriesCatalog.
+     * @param ts time series to update
+     * @param tscatalog time series catalog to supply properties
      */
     private void setTimeSeriesProperties ( TS ts, TimeSeriesCatalog tscatalog ) {
     	// Set all the Synoptic properties that are known for the time series.
-    	/*
-    	ts.setProperty("station_id", tscatalog.getStationId());
-    	ts.setProperty("station_latitude", tscatalog.getStationLatitude());
-    	ts.setProperty("station_longitude", tscatalog.getStationLongitude());
-    	ts.setProperty("station_longname", tscatalog.getStationName());
-    	ts.setProperty("station_name", tscatalog.getStationName());
-    	ts.setProperty("station_no", tscatalog.getStationNo());
+    	ts.setProperty("station.ELEVATION", tscatalog.getStationElevation());
+    	ts.setProperty("station.ELEV_DEM", tscatalog.getStationElevDem());
+    	ts.setProperty("station.LATITUDE", tscatalog.getStationLatitude());
+    	ts.setProperty("station.LONGITUDE", tscatalog.getStationLongitude());
+    	ts.setProperty("station.MNET", tscatalog.getStationMnet());
+    	ts.setProperty("station.MNET_ID", tscatalog.getStationMnetId());
+    	ts.setProperty("station.NAME", tscatalog.getStationName());
+    	ts.setProperty("station.QC_FLAGGED", tscatalog.getStationQcFlagged());
+    	ts.setProperty("station.STATE", tscatalog.getStationState());
+    	ts.setProperty("station.STATUS", tscatalog.getStationStatus());
+    	ts.setProperty("station.STID", tscatalog.getStationId());
+    	ts.setProperty("station.TIMEZONE", tscatalog.getStationTimeZone());
 
-    	ts.setProperty("stationparmeter_longname", tscatalog.getStationParameterLongName());
-    	ts.setProperty("stationparmeter_name", tscatalog.getStationParameterName());
-    	ts.setProperty("stationparmeter_no", tscatalog.getStationParameterNo());
-
-    	ts.setProperty("ts_id", tscatalog.getTsId());
-    	ts.setProperty("ts_name", tscatalog.getTsName());
-    	ts.setProperty("ts_path", tscatalog.getTsPath());
-    	ts.setProperty("ts_shortname", tscatalog.getTsShortName());
-    	ts.setProperty("ts_unitname", tscatalog.getTsUnitName());
-    	ts.setProperty("ts_unitname_abs", tscatalog.getTsUnitNameAbs());
-    	ts.setProperty("ts_unitsymbol", tscatalog.getTsUnitSymbol());
-    	ts.setProperty("ts_unitsymbol_abs", tscatalog.getTsUnitSymbolAbs());
-    	*/
+    	ts.setProperty("sensor.SENSOR_VARIABLE", tscatalog.getSensorVariable());
+    	ts.setProperty("sensor.SENSOR_VARIABLE_OUT", tscatalog.getSensorVariableOut());
+    	ts.setProperty("sensor.start", tscatalog.getSensorStart());
+    	ts.setProperty("sensor.end", tscatalog.getSensorEnd());
     }
 
 }

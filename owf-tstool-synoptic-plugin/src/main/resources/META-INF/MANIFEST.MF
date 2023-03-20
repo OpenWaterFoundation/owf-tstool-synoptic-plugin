@@ -12,7 +12,7 @@ DataStore-Class: org.openwaterfoundation.tstool.plugin.synoptic.
  datastore.SynopticDataStore
 DataStoreFactory-Class: org.openwaterfoundation.tstool.plugin.synoptic.
  datastore.SynopticDataStoreFactory
-xCommand-Class1: org.openwaterfoundation.tstool.plugin.synoptic.
+Command-Class1: org.openwaterfoundation.tstool.plugin.synoptic.
  commands.ReadSynoptic_Command
 Class-Path: dep/
 

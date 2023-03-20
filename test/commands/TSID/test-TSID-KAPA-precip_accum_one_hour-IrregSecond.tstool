@@ -1,0 +1,15 @@
+# Test reading a Synoptic TSID:
+# - compare the result from TSID and ReadSynoptic commands
+# - recent 3 month period
+StartLog(LogFile="Results/test-TSID-KAPA-precip-accum_one_hour-IrregSecond.tstool.log")
+# Read the test period.
+SetInputPeriod(InputStart="2022-05-01 00:00",InputEnd="2022-07-31 23:59")
+KAPA.ASOS/AWOS.precip_accum_one_hour.IrregSecond~Synoptic
+ReadSynoptic(DataStore="Synoptic",DataType="precip_accum_one_hour",Interval="IrregSecond",StationId="KAPA")
+# Compare the in-memory time series.
+CompareTimeSeries(IfDifferent="Warn")
+# Read the web services data using WebGet to visually check the data:
+# - TSTool 14.7.0 is required for the SetPropertyFromDataStore command
+SetPropertyFromDataStore(DataStore="Synoptic",DataStoreProperty="ApiToken",PropertyName="SynopticApiToken")
+WebGet(URI="https://api.synopticdata.com/v2/stations/timeseries?token=${SynopticApiToken}&stid=KAPA&vars=precip_accum_one_hour&obtimezone=local&units=english&start=202205010600&end=202208010559",EncodeURI="False",LocalFile="results/test-TSID-KAPA-precip-accum_one_hour-IrregSecond.tstool.json")
+NewObject(ObjectID="TestJSON",InputFile="results/test-TSID-KAPA-precip-accum_one_hour-IrregSecond.tstool.json")

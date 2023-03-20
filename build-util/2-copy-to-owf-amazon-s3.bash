@@ -248,7 +248,7 @@ printUsage() {
   echoStderr ""
   echoStderr "Usage:  ${programName} --aws-profile=profile"
   echoStderr ""
-  echoStderr "Copy the TSTool AWS plugin installer files to the Amazon S3 static website folder:"
+  echoStderr "Copy the TSTool Synoptic plugin installer files to the Amazon S3 static website folder:"
   echoStderr "  ${s3FolderUrl}"
   echoStderr "The latest installer matching the current plugin version is uploaded."
   echoStderr ""
@@ -394,7 +394,7 @@ uploadInstaller() {
     # The following handles Windows upload when run on Cygwin.
     if [ "$includeWindows" = "yes" ]; then
       # File for the zip file (Windows).
-      zipFilePattern="${distFolder}/tstool-aws-plugin-${pluginVersion}-win-*.zip"
+      zipFilePattern="${distFolder}/tstool-synoptic-plugin-${pluginVersion}-win-*.zip"
       logInfo "Zip file pattern is: ${zipFilePattern}"
       # Get the latest installer for the version.
       latestZipFile=$(ls -1 ${zipFilePattern} | sort -r | head -1)
@@ -422,7 +422,7 @@ uploadInstaller() {
             exit 1
           fi
           # Use a wildcard to invalidate subfolders.
-          cloudFrontFile="/tstool-aws-plugin/${pluginVersion}/software/*"
+          cloudFrontFile="/tstool-synoptic-plugin/${pluginVersion}/software/*"
           invalidateCloudFront ${cloudFrontDistributionId} ${cloudFrontFile}
         fi
       else
@@ -460,8 +460,8 @@ pluginVersion=$(getPluginVersion)
 setAwsExe
 
 # Root AWS S3 location where files are to be uploaded.
-s3FolderUrl="s3://software.openwaterfoundation.org/tstool-aws-plugin"
-gpDownloadUrl="https://software.openwaterfoundation.org/tstool-aws-plugin"
+s3FolderUrl="s3://software.openwaterfoundation.org/tstool-synoptic-plugin"
+gpDownloadUrl="https://software.openwaterfoundation.org/tstool-synoptic-plugin"
 
 # Defaults for whether operating systems are included in upload:
 # - default is to upload all but change when Windows is not involved since won't be on the machine

@@ -1,4 +1,4 @@
-// TimeSeries - class containing Synoptic time series 
+// StationObservations - class containing STATION.OBSERVATIONS
 
 /* NoticeStart
 
@@ -22,67 +22,61 @@ NoticeEnd */
 
 package org.openwaterfoundation.tstool.plugin.synoptic.dao;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Synoptic time series.
+ * Variable for Synoptic STATION.OBSERVATIONS.
  * See: https://developers.synopticdata.com/mesonet/v2/stations/timeseries/
+ *
+ * Each station has a list of observations
+ *
+ *  "STATION": [
+ *     {
+ *        "OBSERVATIONS": {
+ *          "date_time": [
+ *            "2015-01-03T00:00:00Z",
+ *            "2015-01-03T00:05:00Z",
+ *            "2015-01-03T00:10:00Z",
+ *            "2015-01-03T00:15:00Z",
+ *            "2015-01-03T00:20:00Z"
+ *          ],
+ *          "air_temp_set_1": [-5.6, -5.6, -6.1, -6.1, -6.7]
+ *        }
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TimeSeries {
-	
-	/**
-	 * 'UNITS'
-	 */
-	private List<Units> units = new ArrayList<>();
+public class StationObservations {
 
 	/**
-	 * 'name'.
+	 * 'date_time' array.
 	 */
-	private String name = "";
+	@JsonProperty("date_time")
+	private String [] dateTimeArray = null;
 
 	/**
-	 * 'unit'.
+	 * Sensor variable values corresponding to the dateTimeArray:
+	 * - these are filled in later
 	 */
-	private String unit = "";
-	
+	private Double [] valueArray = null;
+
 	/**
 	 * Default constructor used by Jackson.
 	 */
-	public TimeSeries() {
+	public StationObservations() {
 	}
 
 	/**
-	 * Get the variable long name.
+	 * Get the dateTimeArray.
 	 */
-	/*
-	public String getLongName() {
-		return this.longName;
-	}
-	*/
-	
-	/**
-	 * Get the variable name.
-	 */
-	public String getName() {
-		return this.name;
+	public String [] getDateTimeArray() {
+		return this.dateTimeArray;
 	}
 
 	/**
-	 * Get the variable units.
+	 * Get the variable array.
 	 */
-	public String getUnit() {
-		return this.unit;
+	public Double [] getValueArray() {
+		return this.valueArray;
 	}
 
-	/**
-	 * Set the variable name.
-	 * @param name variable name.
-	 */
-	public void setName ( String name ) {
-		this.name = name;
-	}
 }

@@ -213,4 +213,24 @@ public class Network {
 		}
 		return null;
 	}
+
+	/**
+	 * Lookup at network from the short name.
+	 * @param networkList list of Network to search
+	 * @param shortname network short name to match
+	 * @return matching Network or null if not found
+	 */
+	public static Network lookupNetworkFromShortName ( List<Network> networkList, String shortname ) {
+		if ( (networkList == null) || (shortname == null) ) {
+			return null;
+		}
+		for ( Network network : networkList ) {
+			if ( network.shortname != null ) {
+				if ( network.shortname.equals(shortname) ) {
+					return network;
+				}
+			}
+		}
+		return null;
+	}
 }

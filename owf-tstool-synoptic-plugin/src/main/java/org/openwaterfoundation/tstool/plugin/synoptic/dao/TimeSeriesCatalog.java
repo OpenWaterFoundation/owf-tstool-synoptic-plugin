@@ -25,6 +25,8 @@ package org.openwaterfoundation.tstool.plugin.synoptic.dao;
 import java.util.ArrayList;
 import java.util.List;
 
+import RTi.Util.Time.DateTime;
+
 /**
  * Class to store time series catalog (metadata) for Synoptic time series list.
  * This is a combination of standard time series properties used in TSTool and ASOS data.
@@ -64,7 +66,9 @@ public class TimeSeriesCatalog {
 	private String sensorVariableOut = "";
 	// Data have start and and as strings and format seems inconsistent.
 	private String sensorStart = "";
+	private DateTime sensorStartDateTime = null;
 	private String sensorEnd = "";
+	private DateTime sensorEndDateTime = null;
 
 	// List of problems, one string per issue.
 	private List<String> problems = null; // Initialize to null to save memory ... must check elsewhere when using.
@@ -314,8 +318,16 @@ public class TimeSeriesCatalog {
 		return this.sensorEnd;
 	}
 
+	public DateTime getSensorEndDateTime ( ) {
+		return this.sensorEndDateTime;
+	}
+
 	public String getSensorStart ( ) {
 		return this.sensorStart;
+	}
+
+	public DateTime getSensorStartDateTime ( ) {
+		return this.sensorStartDateTime;
 	}
 
 	public String getSensorVariable ( ) {
@@ -399,12 +411,42 @@ public class TimeSeriesCatalog {
 		this.haveCheckDataProblemsBeenSet = haveCheckDataProblemsBeenSet;
 	}
 
+	/**
+	 * Set the sensor end.
+	 * The DateTime will also be set if possible.
+	 * @param sensorEnd sensor end date/time string
+	 */
 	public void setSensorEnd ( String sensorEnd ) {
 		this.sensorEnd = sensorEnd;
+		this.sensorEndDateTime = null;
+		if ( (sensorEnd != null) && !sensorEnd.isEmpty() ) {
+			// Also parse into a DateTime:
+			// - typical format is "1997-01-02T14:55:00Z"
+			try {
+				this.sensorEndDateTime = DateTime.parse(sensorEnd);
+			}
+			catch ( Exception e ) {
+				this.sensorEndDateTime = null;
+			}
+		}
 	}
 
+	/**
+	 * Set the sensor start.
+	 * The DateTime will also be set if possible.
+	 * @param sensorEnd sensor end date/time string
+	 */
 	public void setSensorStart ( String sensorStart ) {
 		this.sensorStart = sensorStart;
+		this.sensorStartDateTime = null;
+		if ( (sensorStart != null) && !sensorStart.isEmpty() ) {
+			try {
+				this.sensorStartDateTime = DateTime.parse(sensorStart);
+			}
+			catch ( Exception e ) {
+				this.sensorStartDateTime = null;
+			}
+		}
 	}
 
 	public void setSensorVariable ( String sensorVariable ) {

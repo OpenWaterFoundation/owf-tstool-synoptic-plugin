@@ -38,7 +38,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *      "cloud_layer_2": "Meters",
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LatestUnits {
+public class Units {
 	
 	/**
 	 * Variable name associated with units.
@@ -53,7 +53,7 @@ public class LatestUnits {
 	/**
 	 * Default constructor used by Jackson.
 	 */
-	public LatestUnits() {
+	public Units() {
 	}
 
 	/**
@@ -61,7 +61,7 @@ public class LatestUnits {
 	 * @param variableName the variable name
 	 * @param units the units for the variable
 	 */
-	public LatestUnits ( String variableName, String units ) {
+	public Units ( String variableName, String units ) {
 		this.variableName = variableName;
 		this.units = units;
 	}
@@ -86,11 +86,11 @@ public class LatestUnits {
 	 * @param variableName variable name to look up
 	 * @return matching LatestUnits or null if not found
 	 */
-	public static LatestUnits lookupLatestUnitsFromVariable ( List<LatestUnits> latestUnitsList, String variableName ) {
+	public static Units lookupLatestUnitsFromVariable ( List<Units> latestUnitsList, String variableName ) {
 		if ( (latestUnitsList == null) || (variableName == null) ) {
 			return null;
 		}
-		for ( LatestUnits latestUnits : latestUnitsList ) {
+		for ( Units latestUnits : latestUnitsList ) {
 			if ( latestUnits.variableName != null ) {
 				if ( latestUnits.variableName.equals(variableName) ) {
 					return latestUnits;

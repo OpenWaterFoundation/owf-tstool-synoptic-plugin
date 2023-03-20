@@ -29,7 +29,6 @@ import java.util.List;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.Network;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.NwsCwa;
 import org.openwaterfoundation.tstool.plugin.synoptic.dao.State;
-import org.openwaterfoundation.tstool.plugin.synoptic.dao.TimeSeriesCatalog;
 import org.openwaterfoundation.tstool.plugin.synoptic.datastore.SynopticDataStore;
 
 import RTi.Util.GUI.InputFilter;
@@ -211,6 +210,8 @@ public class Synoptic_TimeSeries_InputFilter_JPanel extends InputFilter_JPanel {
 	    	filter.removeConstraint(InputFilter.INPUT_CONTAINS);
 	    	filter.removeConstraint(InputFilter.INPUT_ENDS_WITH);
 	    	filter.removeConstraint(InputFilter.INPUT_STARTS_WITH);
+	    	// Tell the filter that values need to be parsed because of the additional note.
+	    	filter.setTokenInfo ( "-", 0, StringUtil.TYPE_STRING );
 	    	filters.add(filter);
 	    }
 
@@ -230,15 +231,25 @@ public class Synoptic_TimeSeries_InputFilter_JPanel extends InputFilter_JPanel {
 	    	filters.add(filter);
 	    }
 
+	    // Station ID:
+	    // - add a text field so that a list of stations can be queried
+    	InputFilter filter = new InputFilter("Station - ID",
+        	"stid", "stid", "stid",
+        	StringUtil.TYPE_STRING, null, null, false);
+    	filter.removeConstraint(InputFilter.INPUT_CONTAINS);
+    	filter.removeConstraint(InputFilter.INPUT_ENDS_WITH);
+    	filter.removeConstraint(InputFilter.INPUT_STARTS_WITH);
+    	filters.add(filter);
+
 	    // Status.
 	    if ( statusChoices.size() > 0 ) {
-	    	InputFilter filter = new InputFilter("Status",
+	    	InputFilter stidFilter = new InputFilter("Status",
 	        	"status", "status", "status",
 	        	StringUtil.TYPE_STRING, statusChoices, statusChoices, false);
-	    	filter.removeConstraint(InputFilter.INPUT_CONTAINS);
-	    	filter.removeConstraint(InputFilter.INPUT_ENDS_WITH);
-	    	filter.removeConstraint(InputFilter.INPUT_STARTS_WITH);
-	    	filters.add(filter);
+	    	stidFilter.removeConstraint(InputFilter.INPUT_CONTAINS);
+	    	stidFilter.removeConstraint(InputFilter.INPUT_ENDS_WITH);
+	    	stidFilter.removeConstraint(InputFilter.INPUT_STARTS_WITH);
+	    	filters.add(stidFilter);
 	    }
 
 	  	setToolTipText("<html>Specify one or more input filters to limit query, will be ANDed.</html>");

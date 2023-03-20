@@ -7,7 +7,7 @@ TSTool is part of [Colorado's Decision Support Systems (CDSS)](https://www.color
 See the following online resources:
 
 *   [Synoptic API documentation](https://developers.synopticdata.com/mesonet/) - requires a Synoptic account and API token
-*   [MesoWest Web Services Portal](https://mesowest.utah.edu/) - uses Synoptic API
+*   [MesoWest web services portal](https://mesowest.utah.edu/) - uses the Synoptic API
 *   [TSTool Synoptic Plugin download page](https://software.openwaterfoundation.org/tstool-synoptic-plugin/)
 *   [TSTool Synoptic Plugin Documentation](https://software.openwaterfoundation.org/tstool-synoptic-plugin/latest/doc-user/)
 *   [TSTool User Documentation](https://opencdss.state.co.us/tstool/latest/doc-user/)

@@ -133,9 +133,9 @@ public class Synoptic_TimeSeries_TableModel extends JWorksheet_AbstractRowTableM
 			case COL_DATA_UNITS: return "Units";
 			case COL_SENSOR_VARIABLE: return "Sensor Variable";
 			case COL_SENSOR_VARIABLE_OUT: return "Sensor Variable (Out)";
-			case COL_SENSOR_START: return "Start";
-			case COL_SENSOR_END: return "End";
-			case COL_STATION_TIMEZONE: return "Time Zone";
+			case COL_SENSOR_START: return "Start (UTC)";
+			case COL_SENSOR_END: return "End (UTC)";
+			case COL_STATION_TIMEZONE: return "Station Time Zone";
 			case COL_STATION_STATE: return "State";
 			case COL_STATION_STATUS: return "Status";
 			case COL_STATION_QC_FLAGGED: return "QC Flagged";
@@ -166,8 +166,8 @@ public class Synoptic_TimeSeries_TableModel extends JWorksheet_AbstractRowTableM
 	    toolTips[COL_DATA_UNITS] = "Time series data value units abbreviation (UNITS)";
 	    toolTips[COL_SENSOR_VARIABLE] = "Sensor variable (SENSOR_VARIABLE)";
 	    toolTips[COL_SENSOR_VARIABLE_OUT] = "Sensor variable in output, used for uniqueness when multiple same sensor variable";
-	    toolTips[COL_SENSOR_START] = "Period of record start for the sensor veriable.";
-	    toolTips[COL_SENSOR_END] = "Period of record end for the sensor variable.";
+	    toolTips[COL_SENSOR_START] = "Period of record start for the sensor veriable (UTC).";
+	    toolTips[COL_SENSOR_END] = "Period of record end for the sensor variable (UTC).";
 	    toolTips[COL_STATION_TIMEZONE] = "Station local time zone.";
 	    toolTips[COL_STATION_STATE] = "State (STATE)";
 	    toolTips[COL_STATION_STATUS] = "Station status (STATUS)";
@@ -199,7 +199,7 @@ public class Synoptic_TimeSeries_TableModel extends JWorksheet_AbstractRowTableM
 	    widths[COL_SENSOR_VARIABLE_OUT] = 15;
 	    widths[COL_SENSOR_START] = 13;
 	    widths[COL_SENSOR_END] = 13;
-	    widths[COL_STATION_TIMEZONE] = 10;
+	    widths[COL_STATION_TIMEZONE] = 15;
 	    widths[COL_STATION_STATE] = 5;
 	    widths[COL_STATION_STATUS] = 6;
 	    widths[COL_STATION_QC_FLAGGED] = 8;
