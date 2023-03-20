@@ -33,6 +33,9 @@ command can be used to retrieve data from any web service and save to a file.
 For example, a JSON format file can be saved and the resulting file can be read using commands such as
 [`NewObject`](https://opencdss.state.co.us/tstool/latest/doc-user/command-ref/NewObject/NewObject/).
 These general commands provide flexibility to retrieve data in addition to the specific Synoptic datastore commands.
+See the [`SetPropertyFromDataStore`](https://opencdss.state.co.us/tstool/latest/doc-user/command-ref/SetPropertyFromDataStore/NSetPropertyFromDataStore/)
+command (available in TSTool 14.7.0) to set a processor property from the `ApiToken` datastore property
+so that the token can be used in `WebGet` commands without hard-coding the token.
 
 ## Web Service to Time Series Mapping ##
 
@@ -88,6 +91,8 @@ The meaning of the TSID parts is as follows:
     +   Synoptic station identifier (`stid`).
 *   The `DataSource` is set to:
     +   Synoptic network (`MNET` as short name).
+    +   See the [Synoptic Station Networks & Providers](https://developers.synopticdata.com/about/station-providers/) web page
+        for information about networks and maps showing stations in each network.
 *   The `DataType` is set to:
     +   Synoptic station sensor variable (e.g., `precip_accum_one_hour`).
     +   If there are multiple sensors of the same variable type for the station,
@@ -190,7 +195,7 @@ but is often the same as the `Name` with extension `.cfg`.
 # Properties are:
 #
 # Enabled - indicates if the datastore is enabled (active)
-# ServiceApiDocumentationUri - URI for online API documentation
+# ServiceApiDocumentationURI - URI for online API documentation
 # Type - must be SynopticDataStore to find proper software
 #
 # The user will see the following when interacting with the data store:
@@ -206,7 +211,7 @@ Type = "SynopticDataStore"
 Name = "Synoptic"
 Description = "Synoptic Data (Synoptic) web services"
 ServiceRootURI = "https://api.synopticdata.com/v2"
-ServiceApiDocumentationUri = "https://developers.synopticdata.com/mesonet/"
+ServiceApiDocumentationURI = "https://developers.synopticdata.com/mesonet/"
 ApiToken = "INSERT_TOKEN_HERE"
 ```
 
@@ -224,6 +229,7 @@ Synoptic  Web Services DataStore Configuration File Properties
 
 | **Property**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | **Description** | **Default** |
 | -- | -- | -- |
+| `ApiToken`<br>**required** | API token to authenticate requests.  See the [Synoptic Getting Started with the Mesonet Web Services](https://developers.synopticdata.com/mesonet/v2/getting-started/) documentation. | None - must be specified. |
 | `Description`<br>**required** | Description of the datastore, typically a short sentence, used in some displays. | None - must be specified. |
 | `Enabled` | Indicates whether the datastore is enabled. | `True` |
 | `Name`<br>**required** | Datastore name that is used in the TSTool software and Synoptic  commands.  The name should be unique across all datastores. | None - must be specified. |
