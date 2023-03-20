@@ -36,3 +36,21 @@ The [Synoptic datastore documentation](../datastore-ref/Synoptic/Synoptic.md) de
 
 The [`ReadSynoptic`](../command-ref/ReadSynoptic/ReadSynoptic.md) command can be used to read time series,
 in addition to time series identifiers that are generated from the main TSTool interface.
+
+See the following examples showing how to query air temperature time series and the resulting time series graph.
+
+**<p style="text-align: center;">
+![tstool-main](tstool-main.png)
+</p>**
+
+**<p style="text-align: center;">
+TSTool Main Interface (<a href="../tstool-main.png">see also the full-size image)</a>
+</p>**
+
+**<p style="text-align: center;">
+![tstool-graph](tstool-graph.png)
+</p>**
+
+**<p style="text-align: center;">
+TSTool Graph (<a href="../tstool-graph.png">see also the full-size image)</a>
+</p>**
