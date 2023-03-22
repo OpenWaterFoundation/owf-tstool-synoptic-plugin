@@ -1,0 +1,15 @@
+#
+# Read ASOS airport data from the Synoptic web services and convert to data that can be loaded into NovaStar:
+# - the original data has irregular interval with reports at approximately 5Minute intervals
+# - the cumulative precipitation resets every hour and then accumulates during the hour
+# - the reset seems to occur near minute 53 of the hour
+# - the approximately 5 minute rain increments can be calculated as the difference beteen current and previous value
+SetInputPeriod(InputStart="2022-01-01 00:00",InputEnd="CurrentToMinute.Round(5Minute)")
+ReadSynoptic(DataStore="Synoptic",DataType="precip_accum_one_hour",Interval="IrregSecond",StationId="KAPA",Alias="KAPA-original")
+#
+# Fill all missing values with zeros so that delta can be computed.
+FillConstant(ConstantValue="0",FillFlag="Z")
+#
+# Compute the difference between each value,
+# which is the incremental precipitation recorded at the date/time.
+Delta(TSList="AllMatchingTSID",TSID="KAPA-original",ExpectedTrend="Increasing",ResetType="Auto",Flag="Auto",Alias="KAPA-increment")
