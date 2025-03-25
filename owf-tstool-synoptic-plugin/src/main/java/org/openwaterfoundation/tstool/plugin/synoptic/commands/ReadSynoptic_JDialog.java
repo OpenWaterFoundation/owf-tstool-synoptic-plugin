@@ -210,15 +210,14 @@ Refresh the query choices for the currently selected Synoptic location identifie
 @param value if non-null, then the selection is from the command initialization,
 in which case the specified data type should be selected
 */
+/*
 private void actionPerformedStationIdSelected ( ) {
-	/*
     if ( __StationId_JComboBox.getSelected() == null ) {
         // Startup initialization.
         return;
     }
-    */
 }
-
+*/
 
 // Start event handlers for DocumentListener...
 
@@ -1175,7 +1174,7 @@ private void refresh () {
         // First populate the data type choices.
         populateDataTypeChoices(getSelectedDataStore() );
         // Then set to the value from the command.
-        int [] index = new int[1];
+        //int [] index = new int[1];
         //Message.printStatus(2,routine,"Checking to see if DataType=\"" + DataType + "\" is a choice.");
         //if ( JGUIUtil.isSimpleJComboBoxItem(__DataType_JComboBox, DataType, JGUIUtil.CHECK_SUBSTRINGS, "-", 0, index, true ) ) {
 	    if ( JGUIUtil.isSimpleJComboBoxItem( __DataType_JComboBox, DataType, JGUIUtil.NONE, null, null ) ) {
