@@ -344,7 +344,7 @@ private HashMap<String,Object> createReadProperties ( String timezone, boolean d
 		readProperties.put("TimeZone", timezone );
 	}
 	if ( debug ) {
-		readProperties.put("Debug", new Boolean(true) );
+		readProperties.put("Debug", Boolean.TRUE );
 	}
 	if ( (irregularInterval != null) && !irregularInterval.isEmpty() ) {
 		readProperties.put("IrregularInterval", irregularInterval );
@@ -439,7 +439,7 @@ throws InvalidCommandParameterException, CommandWarningException, CommandExcepti
     CommandStatus status = getCommandStatus();
     status.clearLog(commandPhase);
 
-    Boolean clearStatus = new Boolean(true); // Default.
+    Boolean clearStatus = Boolean.TRUE; // Default.
     try {
     	Object o = processor.getPropContents("CommandsShouldClearRunStatus");
     	if ( o != null ) {

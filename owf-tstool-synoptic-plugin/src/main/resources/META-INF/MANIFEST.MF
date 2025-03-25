@@ -8,6 +8,9 @@ Comment7: Command-Class1 is the path to a command class.
 Comment8: Increment the number as needed for the number of command classes.
 Comment9: Class-Path contains the dep/ folder for dependency jar files.
 manifest-Version: 1.0
+Plugin-Name: owf-tstool-synoptic-plugin
+Plugin-Version: 2.0.0
+TSTool-Version: >= 15.0.0
 DataStore-Class: org.openwaterfoundation.tstool.plugin.synoptic.
  datastore.SynopticDataStore
 DataStoreFactory-Class: org.openwaterfoundation.tstool.plugin.synoptic.

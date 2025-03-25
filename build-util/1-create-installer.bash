@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Create the plugin installer file for the download website:
-# - the current files in the following folder are zipped
+# - the current files in the following folder are zipped, keeping the plugin main folder:
 #   ./tstool/NN/plugins/owf-tstool-synoptic-plugin/
 # - output is to the plugin 'dist' folder with filename like:
 #     tstool-synoptic-plugin-1.0.0-win-2206060102.zip
@@ -32,26 +32,26 @@ checkOperatingSystem() {
   echoStderr "[INFO] operatingSystem=${operatingSystem} (used to check for Cygwin and filemode compatibility)"
 
   if [ "${operatingSystem}" != "mingw" ]; then
-    echoStderr "[ERROR] ${errorColor}Currently this script only works for MINGW (Git Bash)${endColor}"
+    echoStderr "${errorColor}[ERROR] Currently this script only works for MINGW (Git Bash)${endColor}"
     exit 1
   fi
 }
 
-# Determine which echo to use, needs to support -e to output colored text
+# Determine which echo to use, needs to support -e to output colored text:
 # - normally built-in shell echo is OK, but on Debian Linux dash is used, and it does not support -e
 configureEcho() {
   echo2='echo -e'
   testEcho=$(echo -e test)
   if [ "${testEcho}" = '-e test' ]; then
     # The -e option did not work as intended:
-    # -using the normal /bin/echo should work
-    # -printf is also an option
+    # - using the normal /bin/echo should work
+    # - printf is also an option
     echo2='/bin/echo -e'
-    # The following does not seem to work
+    # The following does not seem to work.
     #echo2='printf'
   fi
 
-  # Strings to change colors on output, to make it easier to indicate when actions are needed
+  # Strings to change colors on output, to make it easier to indicate when actions are needed:
   # - Colors in Git Bash:  https://stackoverflow.com/questions/21243172/how-to-change-rgb-colors-in-git-bash-for-windows
   # - Useful info:  http://webhome.csc.uvic.ca/~sae/seng265/fall04/tips/s265s047-tips/bash-using-colors.html
   # - See colors:  https://en.wikipedia.org/wiki/ANSI_escape_code#Unix-like_systems
@@ -77,11 +77,13 @@ createPluginZipFile() {
     echoStderr "[INFO] Removing existing zip file:  ${zipFile}"
     rm -f "${zipFile}"
   fi
-  # Change to the plugins folder.
+  # Change to the plugins folder:
+  # - only want to include the specific version,
+  #   but also include the parent of the version folder
   cd ${pluginsFolder}
   echoStderr "[INFO] Running 7zip to create zip file:  ${zipFile}"
   echoStderr "[INFO] Current folder is:  ${pluginsFolder}"
-  "${sevenzip}" a -tzip ${zipFile} owf-tstool-synoptic-plugin
+  "${sevenzip}" a -tzip ${zipFile} "owf-tstool-synoptic-plugin/${pluginVersion}"
   exitStatus=$?
   if [ ${exitStatus} -ne 0 ]; then
     echoStderr "[INFO] Error running 7zip, exit status (${exitStatus})."
@@ -105,16 +107,16 @@ getPluginVersion() {
   # Maven folder structure results in duplicate 'owf-tstool-synoptic-plugin'?
   # TODO smalers 2022-05-19 need to enable this.
   srcFile="${repoFolder}/owf-tstool-synoptic-plugin/src/main/java/org/openwaterfoundation/tstool/plugin/synoptic/PluginMeta.java"  
-  # Get the version from the code
-  # line looks like:
-  #  public static final String VERSION = "1.0.0 (2022-05-27)";
+  # Get the version from the code line like:
+  #   public static final String VERSION = "1.0.0 (2022-05-27)";
   if [ -f "${srcFile}" ]; then
     cat ${srcFile} | grep 'VERSION =' | cut -d '"' -f 2 | cut -d ' ' -f 1 | tr -d '"' | tr -d ' '
   else
     # Don't echo error to stdout.
     echoStderr "[ERROR] Source file with version does not exist:"
     echoStderr "[ERROR]   ${srcFile}"
-    cat ""
+    # Output an empty string as the version.
+    echo ""
   fi
 }
 
@@ -122,8 +124,8 @@ getPluginVersion() {
 # - the version is printed to stdout so assign function output to a variable
 getTSToolMajorVersion() {
   srcFile="${tstoolMainRepoFolder}/src/DWR/DMI/tstool/TSToolMain.java"  
-  # Get the version from the code.
-  # line looks like:   this.pluginProperties.put("Version", "1.2.0 (2020-05-29");
+  # Get the version from the code line like:
+  #   this.pluginProperties.put("Version", "1.2.0 (2020-05-29");
   cat ${srcFile} | grep 'public static final String PROGRAM_VERSION' | cut -d '=' -f 2 | cut -d '(' -f 1 | tr -d ' ' | tr -d '"' | cut -d '.' -f 1
 }
 
@@ -132,7 +134,7 @@ setJavaInstallHome() {
   javaInstallHome='/C/Program Files/Java/jdk8'
   if [ ! -d "${javaInstallHome}" ]; then
     echoStderr ""
-    echoStderr "[ERROR] ${errorColor}Unable to determine Java location.  Exiting,${endColor}"
+    echoStderr "${errorColor}[ERROR] Unable to determine Java location.  Exiting,${endColor}"
     exit 1
   fi
 }
@@ -162,17 +164,16 @@ sevenzip='/C/Program Files/7-Zip/7z.exe'
 # Get the TSTool major version to find the installed files.
 tstoolMajorVersion=$(getTSToolMajorVersion)
 if [ -z "${tstoolMajorVersion}" ]; then
-  echoStderr "[ERROR] ${errorColor}Unable to determine TSTool major version.${endColor}"
+  echoStderr "${errorColor}[ERROR] Unable to determine TSTool major version.${endColor}"
   exit 1
 else
   echoStderr "[INFO] TSTool major version:  ${tstoolMajorVersion}"
 fi
 
-# Get the plugin version, which is used in the installer file name:
-# 
+# Get the plugin version, which is used in the installer file name.
 pluginVersion=$(getPluginVersion)
 if [ -z "${pluginVersion}" ]; then
-  echoStderr "[ERROR] ${errorColor}Unable to determine plugin version.${endColor}"
+  echoStderr "${errorColor}[ERROR] Unable to determine plugin version.${endColor}"
   exit 1
 else
   echoStderr "[INFO] Plugin version:  ${pluginVersion}"
@@ -182,15 +183,27 @@ fi
 # - put after determining versions
 # - the folders adhere to Maven folder structure
 devBinFolder="${repoFolder}/owf-tstool-synoptic-plugin/target/classes"
+
+# Main folder for installed plugins.
 pluginsFolder="${HOME}/.tstool/${tstoolMajorVersion}/plugins"
-jarFolder="${pluginsFolder}/owf-tstool-synoptic-plugin"
-pluginDepFolder="${pluginsFolder}/owf-tstool-synoptic-plugin/dep"
-jarFile="${jarFolder}/owf-tstool-synoptic-plugin-${pluginVersion}.jar"
+
+# Main installed folder for the plugin.
+mainPluginFolder="${pluginsFolder}/owf-tstool-synoptic-plugin"
+
+# Version installed folder for the plugin.
+versionPluginFolder="${mainPluginFolder}/${pluginVersion}"
+
+# Jar file for the plugin.
+jarFile="${versionPluginFolder}/owf-tstool-synoptic-plugin-${pluginVersion}.jar"
+
+# Plugin dependency folder.
+pluginDepFolder="${versionPluginFolder}/dep"
+
 now=$(date +%Y%m%d%H%M)
 zipFile="${distFolder}/tstool-synoptic-plugin-${pluginVersion}-win-${now}.zip"
 
 # Create the local plugin files to make sure they are current.
-echoStderr "Creating the jar file with current development files..."
+echoStderr "[INFO] Creating the jar file with current development files..."
 ${scriptFolder}/0-create-plugin-jar.bash
 if [ $? -ne 0 ]; then
   echoStderr "[ERROR] Error creating plugin jar file."
